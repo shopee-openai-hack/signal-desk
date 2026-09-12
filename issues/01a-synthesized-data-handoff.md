@@ -1,6 +1,7 @@
 # A ↔ D — M1 controlled demo data handoff
 
 Status: Integrated
+Owner: Morris Chen
 Last updated: 2026-09-12
 
 This issue records the cross-team handoff only. It is not another contract or scenario

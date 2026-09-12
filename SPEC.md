@@ -134,6 +134,11 @@ fields before constructing runtime `EvidenceInput`, so the verifier never receiv
 golden answer. Canonical integration fixtures produced by A remain alongside them
 under `contracts/fixtures/`.
 
+`products.json` and `expected_case_states.json` are B/C evaluation inputs; A neither
+copies them into its store nor turns their business expectations into verifier output.
+External-source excerpts retain D's “verify before demo” gate and are never fetched
+live during replay.
+
 ### 5.2 Source dataset shape
 
 The D source dataset uses a flat envelope:
@@ -340,7 +345,7 @@ controlled. The same document may serve as:
 - A newly ingested Signal that B attaches to the Case.
 - Evidence cited when verifying an earlier Claim.
 
-These roles reference the same underlying synthesized document and do not count as
+These roles reference the same underlying external-source document and do not count as
 two independent sources.
 
 ## 9. Persistence and failure behavior
@@ -471,7 +476,7 @@ does not redefine their business meaning.
 | Controlled staged replay | INT-G8, INT-G9 | INT-C11, INT-C13 | INT-S10, INT-S13 |
 
 The precise source, scenario and scheduling questions remain governed by INT-Q3,
-INT-Q4, INT-Q7, INT-Q10 and INT-Q11. M1 answers only the synthesized-data and
+INT-Q4, INT-Q7, INT-Q10 and INT-Q11. M1 answers only the controlled-data and
 controlled-replay portion of those questions.
 
 ## 13. Frozen M1 integration decisions
@@ -490,6 +495,6 @@ controlled-replay portion of those questions.
 
 ## 14. M2 extension points
 
-M2 may replace the synthesized loader with a Threads source adapter and a live evidence
+M2 may replace the controlled loader with a Threads source adapter and a live evidence
 retriever. Those adapters must map into the same canonical Signal and Evidence models.
 M1 does not pre-implement provider-specific pagination, monitoring or search behavior.
