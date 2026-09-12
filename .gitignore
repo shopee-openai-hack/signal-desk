@@ -12,3 +12,4 @@ frontend/*.tsbuildinfo
 data
 *.sqlite*
 *.db*
+.gstack/
