@@ -213,7 +213,30 @@ class DemoReplayStore:
 
     def get_agent(self, case_id: str) -> dict:
         self.get_case(case_id)
-        return {**self.read()["agent_status"], "source": "backend_replay"}
+        state = self.read()
+        # Describe known business outcomes, never the presentation controller's cursor.
+        descriptions = {
+            1: ("已完成初步整理，等待更多證據", "已保留初始通報，尚無足夠證據確認商品風險", "追蹤泰山與食藥署公告"),
+            2: ("已辨識重複轉傳，持續追蹤", "轉傳未新增獨立證據，維持原判斷", "追蹤泰山與食藥署公告"),
+            3: ("已完成初步查核，等待官方證據", "新增獨立回報與具體批號，案件已提升為高優先", "查詢食藥署公告，比對中聯下游品牌與批號"),
+            4: ("等待員工確認處置範圍", "三筆商品的品牌與批號符合官方證據", "核對商品清單，經人工核可後執行下架"),
+            5: ("等待新候選商品的獨立核可", "候選範圍已擴大，新增商品未套用既有核可", "持續追蹤加工食品公告，補齊新候選商品證據"),
+            6: ("等待後續公告與商品層級證據", "依放行證據縮小候選範圍，既有下架紀錄保留", "追蹤官方後續公告，由營運人員評估剩餘候選商品"),
+        }
+        current, result, next_action = descriptions[state["stage"]]
+        observation = {**state["agent_status"], "source": "backend_replay",
+                       "current_step": current, "latest_result": result,
+                       "next_action": next_action}
+        if state["stage"] == 5:
+            observation["waiting_reason"] = "新增候選商品需要獨立確認，不繼承先前核可"
+        if state["stage"] == 4:
+            observation["waiting_reason"] = "商品狀態變更前，須由商品安全營運人員核可"
+            if STAGE4_PRODUCTS.issubset({p["product_id"] for p in state["products"]
+                                        if p["status"] == "delisted"}):
+                observation.update(current_step="已完成核可商品下架，持續追蹤",
+                                   latest_result="三筆核可商品已完成下架",
+                                   next_action="追蹤後續公告與新增商品證據", waiting_reason=None)
+        return observation
 
     def get_signals(self) -> dict:
         return _page([{key: value for key, value in signal.items() if key != "stage"}
@@ -336,10 +359,10 @@ class DemoReplayStore:
             ):
                 state["agent_status"].update({
                     "state": "waiting_follow_up",
-                    "current_step": "已執行三筆 confirmed 商品的模擬下架",
-                    "latest_result": "Stage 4 已完成核可與逐項執行",
+                    "current_step": "已完成三筆核可商品下架",
+                    "latest_result": "三筆核可商品已完成逐項執行",
                     "waiting_reason": None,
-                    "next_action": "注入 Stage 5 證據",
+                    "next_action": "追蹤後續公告與新增商品證據",
                     "observed_at": _now(),
                 })
             response = {"approval": copy.deepcopy(approval), "executions": results,

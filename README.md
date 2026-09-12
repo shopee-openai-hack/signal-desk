@@ -1,8 +1,22 @@
-# shopee-openai-hack
+# Signal Desk
 
-Hackathon starter: Vite + React + TypeScript + Tailwind + shadcn/ui components + TanStack Query; Python + FastAPI + Pydantic + httpx + uv; OpenAI SDK + a bounded lightweight loop; SQLite; Railway; GitHub Actions.
+從市場通報、證據查核到商品處置的營運工作台。員工可在同一案件中檢視來源、未知事項與候選商品，確認處置範圍後核可並執行下架，透過時間軸與 Trace 回放追溯判斷變化。
 
-Deployed infrastructure, verification evidence and remaining gates: [INFRA_STATUS.md](INFRA_STATUS.md).
+本次展示以食用油安全事件為例。四頁 UI 使用 FastAPI 提供的**受控案例回放**；商品、核可及執行結果保存在 SQLite。回放不是現場 AI 推論，商品為示範資料，未串接真實平台下架。
+
+## 文件入口
+
+| 閱讀目的 | 文件 |
+| --- | --- |
+| 提交概覽、展示路徑與待驗收項目 | [Submission](docs/SUBMISSION.md) |
+| 全專案文件索引與權威順序 | [文件索引](docs/README.md) |
+| 產品範圍與成功條件 | [INTENT](INTENT.md) |
+| 資料契約與即時／回放 API 邊界 | [Contracts](contracts/README.md) |
+| 前端啟動與展示端點 | [Frontend](frontend/README.md) |
+| 六段情境、來源及業務規則 | [Demo pack](docs/demo/demo-pack.md) |
+| 部署設定與歷史驗證證據 | [Infrastructure](INFRA_STATUS.md) |
+
+技術：React / Vite / TypeScript / Tailwind / shadcn / TanStack Query；FastAPI / Pydantic / OpenAI SDK；SQLite；Railway 與 GitHub Actions。
 
 ## Local development（隊友與 Codex 從這裡開始）
 
@@ -70,7 +84,7 @@ Stage 3 開始，商品核可／模擬執行會保存在同一個 SQLite。無�
 | `PUBLIC_ORIGIN` | `http://localhost:5173`；與瀏覽器實際開啟的 origin 一致 |
 | `SESSION_COOKIE_SECURE` | `false`；本機使用 HTTP |
 | `SESSION_SECRET` | 範例值只供本機；保持不變才能沿用匿名 session |
-| `OPENAI_API_KEY` | 空白即可開發，UI 會顯示範例模式；需要真實 AI 時自行加入 backend key |
+| `OPENAI_API_KEY` | 受控展示不需要 key；即時 AI API 才需要 backend key |
 | `OPENAI_MODEL` | 預設 `gpt-4o-mini` |
 
 Railway 上的 key 不會自動同步到本機。不要把 key 貼到聊天、commit、`VITE_*` 或前端程式。
@@ -87,8 +101,9 @@ curl -fsS http://localhost:5173/api/config
 ```
 
 健康回應應包含 `status: "ok"`、`database: "ok"`；沒有 key 時 `mode` 為 `demo`。
-在 UI 輸入一個目標並提交，確認顯示結果與歷史紀錄，再重新整理確認紀錄仍在。
-匿名歷史依 cookie 區分；請固定使用 `localhost`，不要與 `127.0.0.1` 混用。
+另檢查 `/api/v1/demo/status`，確認展示端點正常。開啟案件列表，進入案件檢視商品與歷程。
+依 [前端操作路徑](frontend/README.md#操作路徑) 驗證核可、執行與重新整理後的狀態。
+`/api/config` 的 mode 描述 provider 設定，不代表四頁 UI 正在執行模型。展示狀態由同一資料庫共享，不依瀏覽器 cookie 隔離。
 
 ### 5. 提交前檢查
 
@@ -140,7 +155,8 @@ PUBLIC_ORIGIN=http://localhost:8000 .venv/bin/uv run uvicorn app.main:app --env-
 > 回報修改與驗證結果；除非我授權，不要 commit、push 或變更 Railway production。
 
 程式入口：`frontend/src/App.tsx` 是 UI，`app/main.py` 是 HTTP API，
-`app/schemas.py` 是資料合約，`app/planner.py` 是 AI 邏輯，`app/store.py` 是 SQLite。
+`app/schemas.py` 是資料合約，`app/demo_replay.py` 是展示控制與商品操作；`app/case_agent.py` 與 `app/case_store.py`、訊號與查核模組提供即時案件流程。
+`app/planner.py` 與 `/api/runs` 為保留的 starter 範例，不是目前四頁的資料來源。
 新增 shadcn 元件時從 `frontend` 執行其 CLI；既有 alias、tokens 和 components.json 可沿用。
 
 ## Railway
@@ -172,8 +188,10 @@ Configure the GitHub `production` environment:
 
 Set environment approval rules if desired. Disable Railway's direct GitHub auto-deploy when using this workflow, so it cannot deploy before CI passes. The workflow records the uploaded deployment ID and verifies that exact deployment. `workflow_dispatch` on main supports retrying a known commit. Never put the OpenAI key in frontend `VITE_*` variables or GitHub build args.
 
-## Defaults and limits
+## 保留的 starter 範例限制
+
+以下描述 `/api/runs` 範例，不代表案件與展示端點的統一限制。
 
 One process, anonymous signed browser sessions; clearing cookies loses access to history. Total 8 submissions/minute, 100 admissions per UTC day stored transactionally, 2 concurrent model jobs, max 2 model attempts, 1000 output tokens per attempt, 500 input characters, 16KB request body. DB connections/transactions are short and close before awaiting a model. Interrupted runs become failed after 15 minutes when history/readiness is checked. No automatic job resume, login accounts, external tool execution, ORM, Postgres or Redis.
 
-Extend product models in `app/schemas.py`, agent logic in `app/planner.py`, persistence in `app/store.py`, and UI in `frontend/src/App.tsx`. Use TanStack Query for server state and invalidate `runs` after mutations. Do not auto-retry cost-bearing mutations. Keep sample mode visible.
+Extend product models in `app/schemas.py`, agent logic in `app/planner.py`, persistence in `app/store.py`, and UI in `frontend/src/App.tsx`. Use TanStack Query for server state and invalidate the affected Case, Product and Approval queries after mutations. Do not auto-retry cost-bearing mutations. Keep sample mode visible.

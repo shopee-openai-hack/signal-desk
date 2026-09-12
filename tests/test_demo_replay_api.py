@@ -42,7 +42,11 @@ def test_fastapi_full_replay_and_c_actions(tmp_path, monkeypatch):
         assert len(client.get("/api/v1/demo/cases").json()["items"]) == 1
         assert len(client.get("/api/v1/demo/signals").json()["items"]) == 3
         assert len(client.get("/api/v1/demo/products").json()["items"]) == 9
-        assert client.get(f"/api/v1/demo/cases/{CASE_ID}/agent-status").json()["source"] == "backend_replay"
+        observation = client.get(f"/api/v1/demo/cases/{CASE_ID}/agent-status").json()
+        assert observation["source"] == "backend_replay"
+        assert all("Stage" not in str(value) and "注入" not in str(value)
+                   for value in observation.values())
+        assert "官方證據" in observation["current_step"]
         trace = client.get("/api/v1/demo/traces/trace_oil_main").json()
         assert len(trace["phases"]) == 6
         assert trace["phases"][3]["status"] == "waiting_human"
