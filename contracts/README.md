@@ -8,8 +8,10 @@ consumers.
 
 ## Ownership and change rules
 
-- B owns this contract and the shared Pydantic models. A and C review changes to
-  fields they produce or consume. D reviews business meanings and examples.
+- B coordinates changes to this central contract. A implements the canonical shared
+  Pydantic models for Signal, Claim and Evidence in `app/schemas.py`; B consumes those
+  models and owns the Case-side models. C owns its Product, Approval and Execution
+  models. D reviews business meanings and examples.
 - API paths are relative and versioned under `/api/v1`.
 - JSON uses `snake_case`, UTC ISO 8601 timestamps, opaque string IDs, and explicit
   `null` for unknown optional values. Never infer missing facts from another post.

@@ -2,6 +2,9 @@
 
 Read `INTENT.md` and `contracts/README.md` before implementation.
 
+M1 synthesized-data ownership and the handoff with D are recorded in
+[`01a-synthesized-data-handoff.md`](01a-synthesized-data-handoff.md).
+
 ## Deliverables
 
 - Implement general source ingestion plus a callable case-specific retrieval path.
