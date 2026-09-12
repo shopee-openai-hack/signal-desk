@@ -215,10 +215,11 @@ infer a value from the current case snapshot.
   missing information, and unknowns. They explain what changed without
   exposing private reasoning.
 
-## Producer and planned consumer mapping
+## Producer and consumer mapping
 
-The consumer column is a target, not completed UI evidence. At this checkpoint
-TracePage renders only legacy steps; vertical phases and activities remain pending.
+The Node mock produces phases and activities, and TracePage renders them as a
+vertical timeline with expandable details. FastAPI does not yet provide a
+saved Trace producer.
 
 | Contract field | Mock producer | Trace consumer |
 | --- | --- | --- |
@@ -229,12 +230,13 @@ TracePage renders only legacy steps; vertical phases and activities remain pendi
 | `case_before`, `case_after` | Versioned business snapshots | Before/after comparison |
 | `next_activity`, `next_phase` | Recorded suggested next action | Contextual next-action hint |
 | `replay` | Read-only playback policy | Play/pause/speed and human pause |
-| legacy `steps` | Existing five/two step fixtures | Compatibility fallback during rollout |
+| legacy `steps` | Existing six/two step fixtures | Compatibility fallback during rollout |
 
-The mock state migration changes schema version 1 to 2 and enriches existing
-trace objects in place. It does not replace approvals, executions, products, or
-case history. The migration is therefore safe for a persisted local demo state;
-the central backend should use an equivalent additive migration.
+The mock state migration now reaches schema version 3. It enriches existing
+trace objects and corrects Stage 2 repost/version semantics, translating later
+Case and approval versions while preserving approvals, executions, products,
+and timeline history. It clears cached mutation responses with old versions.
+The central backend should use its own migration if persisted demo data exists.
 
 ## Scenarios covered by the mock
 

@@ -21,14 +21,15 @@ See [frontend sync handoff](../frontend/SYNC_STATUS.md) for responsibilities and
 acceptance boundaries, [mock integration notes](../frontend/README.md) for current
 responses, and [rich Trace schema proposal](../frontend/TRACE_CONTRACT_PROPOSAL.md)
 for phase/activity snapshots, observable agent work, and retry history. The rich
-Trace producer and tests are available; the vertical UI consumer is still pending.
+The Node mock trace producer and vertical UI consumer are available; the
+FastAPI trace producer is still pending.
 B has reviewed the mock responses, TypeScript types and API client. Saved Trace
 playback must remain read-only and distinct
 from both live execution and the canonical case timeline.
 
 | Read path | Proposed producer | Shape and integration rule |
 |---|---|---|
-| `GET /api/v1/signals` | A store, B case-link lookup | `{items: SignalRead[], next_cursor}`; each item has the canonical Signal fields plus `case_id: string|null`. `null` means persisted but not yet assigned. A's source and claim store remains authoritative. Implemented on the B integration branch. |
+| `GET /api/v1/signals` | A store, B case-link lookup | `{items: SignalRead[], next_cursor}`; each item has the canonical Signal fields plus `case_id: string|null`. `null` means persisted but not yet assigned. A's source and claim store remains authoritative. Implemented in the current FastAPI app. |
 | `GET /api/v1/cases/{case_id}/agent-status` | B/orchestrator | Persisted observation with `case_id`, `agent_id`, `state`, `current_step`, `latest_result`, `waiting_reason`, `next_action`, `observed_at`, `source`. B now saves waiting observations after completed Case work and serves this read; an unavailable observation returns 404. Do not infer `running` from the Case status or monitoring plan. |
 | `GET /api/v1/traces`, `GET /api/v1/traces/{trace_id}` | Replay/trace producer, to be assigned | Paginated summaries and immutable rich `phases`/`activities` detail as in `frontend/TRACE_CONTRACT_PROPOSAL.md`; legacy `steps` is temporary UI compatibility. Reading a trace never advances a Case. |
 | `GET /api/v1/cases/{case_id}/approvals` | C | `{items: ApprovalRecord[], next_cursor}` with each approval's per-product execution, stable IDs, failure and retry attempts. |
@@ -291,12 +292,10 @@ development, each owner supplies fixtures matching this contract in
 
 ### Open producer/consumer coordination (2026-09-12)
 
-- **A + B composition:** A's canonical store is merged into `main`. This B
-  branch injects that store into `CaseStore` and passes a real
-  `InProcessCaseDispatcher` to A by default. A's isolated tests can still
-  inject their recording dispatcher. A cross-workstream test covers ingest,
-  repost, verification, Case advance and the inbox read. These B changes are
-  not yet on `main`.
+- **A + B composition:** The current `main` injects A's canonical store into
+  `CaseStore` and passes `InProcessCaseDispatcher` to A by default. A's
+  isolated tests can still inject their recording dispatcher. A cross-workstream
+  test covers ingest, repost, verification, Case advance and the inbox read.
 - **B + C products and actions:** C must provide the simulated product catalog
   to B. C's approval and execution outcomes must appear in the Case timeline;
   agree on whether `case.version` covers only B assessment revisions or also
@@ -305,8 +304,15 @@ development, each owner supplies fixtures matching this contract in
 - **Frontend mutations:** The mock's reason-only `advanceCase()` request and
   `{case,previous_version}` response differ from B's versioned
   `verification_updates` request and raw Case response. A production replay
-  controller must call A verify and B advance with explicit inputs. Do not
-  make the UI button invent Evidence to satisfy the backend.
+  controller must call A verify and B advance with explicit inputs. The UI now
+  shows this replay button only when `/api/v1/mock/status` identifies the Node
+  mock. Do not make the UI button invent Evidence to satisfy the backend.
+- **Replay cursor versus Case version:** The six demo stages are presentation
+  steps, not assessment revisions. Stage 2 is a pure repost: the inbox and
+  timeline gain a Signal, while the canonical Case stays at v1 with unchanged
+  `updated_at`. List-summary `updated_at` reflects the later timeline item.
+  Stages 3–6 use Case versions 2–5. The Node mock and C UI now keep `demo_stage`
+  distinct from `version`.
 - **Trace producer:** Assign the saved trace producer and persist its immutable
   phases/activities. The current FastAPI app does not yet implement these
   reads, while the Node mock does. Trace playback remains independent of the

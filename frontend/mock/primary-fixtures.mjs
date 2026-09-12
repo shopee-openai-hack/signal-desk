@@ -131,23 +131,8 @@ export function stageDefinition(stage) {
       next_steps: ["追蹤泰山公告", "追蹤食藥署公告"],
       monitoring_plan: { targets: ["泰山", "食藥署公告"], next_check_at: "2026-07-01T05:20:00Z", reason: "medium：每日追蹤弱訊號與官方公告" },
     },
-    2: {
-      version: 2,
-      status: "monitoring",
-      business_impact: "pending",
-      priority: "medium",
-      priority_reasons: ["純轉傳沒有新增獨立來源或新事實，維持原判斷"],
-      claim_ids: ["clm_s1_hypothesis_taishan", "clm_s1_experience_flavor", "clm_s1_request_others", "clm_s2_repost"],
-      candidate_products: [
-        candidate("prod_001", "candidate", "品牌吻合，事件的受影響批號未知", ["affected_batch"]),
-        candidate("prod_002", "candidate", "品牌吻合，商品批號與事件的受影響批號均未知", ["batch", "affected_batch"]),
-      ],
-      unknowns: ["受影響批號與官方公告尚未確認", "轉傳沒有新增獨立事實"],
-      next_steps: ["維持原追蹤計畫", "等待獨立回報或官方公告"],
-      monitoring_plan: { targets: ["泰山", "食藥署公告"], next_check_at: "2026-07-01T05:20:00Z", reason: "medium：純轉傳不增加查核頻率" },
-    },
     3: {
-      version: 3,
+      version: 2,
       status: "investigating",
       business_impact: "risk",
       priority: "high",
@@ -164,7 +149,7 @@ export function stageDefinition(stage) {
       monitoring_plan: { targets: ["食藥署公告", "中聯油脂下游品牌"], next_check_at: "2026-07-01T02:40:00Z", reason: "high：每小時追蹤官方證據與批號" },
     },
     4: {
-      version: 4,
+      version: 3,
       status: "awaiting_approval",
       business_impact: "risk",
       priority: "critical",
@@ -183,7 +168,7 @@ export function stageDefinition(stage) {
       monitoring_plan: { targets: ["官方批號公告", "泰山、福壽、福懋商品"], next_check_at: "2026-07-01T08:15:00Z", reason: "critical：每 15 分鐘追蹤受影響範圍與逐批結果" },
     },
     5: {
-      version: 5,
+      version: 4,
       status: "awaiting_approval",
       business_impact: "risk",
       priority: "critical",
@@ -204,7 +189,7 @@ export function stageDefinition(stage) {
       monitoring_plan: { targets: ["加工食品公告", "賣家補件", "受影響批號"], next_check_at: "2026-07-07T09:15:00Z", reason: "critical：每 15 分鐘追蹤擴大範圍；新候選不沿用舊核可" },
     },
     6: {
-      version: 6,
+      version: 5,
       status: "investigating",
       business_impact: "risk",
       priority: "high",
@@ -225,7 +210,9 @@ export function stageDefinition(stage) {
       monitoring_plan: { targets: ["官方後續公告", "缺批號商品", "加工食品商品層級證據"], next_check_at: "2026-07-23T10:04:00Z", reason: "high：每小時追蹤；部分放行不會自動恢復已下架商品" },
     },
   };
-  const selected = definitions[Math.max(0, Math.min(6, stage))];
+  // Stage is a replay cursor. A pure repost adds a Signal and timeline item,
+  // but does not create a new assessment revision or modify the Case snapshot.
+  const selected = definitions[stage === 2 ? 1 : Math.max(0, Math.min(6, stage))];
   return clone(selected);
 }
 

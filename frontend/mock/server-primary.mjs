@@ -19,7 +19,7 @@ import {
 
 const DEFAULT_STATE_PATH = path.join(os.tmpdir(), "shopee-openai-hack-demo-state.json");
 const PORT = Number(process.env.MOCK_PORT || 4100);
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 const DEFAULT_STAGE = 3;
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,11 +39,11 @@ function stageTimelineItem(stage) {
   const common = { case_id: PRIMARY_CASE_ID, actor: { type: "case_agent", id: "agent_food_safety" } };
   const items = {
     1: { timeline_id: "tl_stage_1", case_version: 1, kind: "signal_added", occurred_at: "2026-06-30T05:20:00Z", summary: "收到 post_001 的弱訊號並建立待查案件。", reason: "來源單一且為二手轉述，保留 potential harm 為 pending，不把味道經驗當成食安證據。", source_refs: ["sig_post_001"] },
-    2: { timeline_id: "tl_stage_2", case_version: 2, kind: "verification_updated", occurred_at: "2026-06-30T10:05:00Z", summary: "post_002 辨識為 post_001 的 repost。", reason: "純轉傳沒有新增獨立來源或事實，不重跑查核、不建立新案件。", source_refs: ["sig_post_002", "sig_post_001"] },
-    3: { timeline_id: "tl_stage_3", case_version: 3, kind: "assessment_updated", occurred_at: "2026-07-01T01:40:00Z", summary: "獨立回報帶入福壽、中聯與批號，案件升為 high。", reason: "同一時間窗的新作者帶來新品牌、上游與批號，足以改變查核與追蹤計畫。", source_refs: ["sig_post_003", "clm_s3_fact_zhonglian"] },
-    4: { timeline_id: "tl_stage_4", case_version: 4, kind: "verification_updated", occurred_at: "2026-07-01T08:00:00Z", summary: "食藥署公告支持中聯批號超標與三個流向品牌。", reason: "官方證據把可處置範圍精確到品牌、品類與批號；三筆 confirmed 仍等待人工核可。", source_refs: ["sig_fda_20260701", "ev_s4_fda_20260701"] },
-    5: { timeline_id: "tl_stage_5", case_version: 5, kind: "assessment_updated", occurred_at: "2026-07-07T09:00:00Z", summary: "官方公告擴大到使用受影響原料的加工食品。", reason: "新增候選需要新的人工核可；上一輪已執行的三筆下架維持有效。", source_refs: ["sig_fda_20260707", "ev_s5_fda_20260707"] },
-    6: { timeline_id: "tl_stage_6", case_version: 6, kind: "verification_updated", occurred_at: "2026-07-23T09:04:00Z", summary: "部分批次獲放行，回放只排除模擬批號 315-1150411。", reason: "中央社證據反駁所有擴大列管批次仍有問題，但不支持恢復既有下架商品。", source_refs: ["sig_cna_20260723", "ev_s6_cna_20260723", "prod_009"] },
+    2: { timeline_id: "tl_stage_2", case_version: 1, kind: "signal_added", occurred_at: "2026-06-30T10:05:00Z", summary: "post_002 辨識為 post_001 的 repost。", reason: "純轉傳沒有新增獨立來源或事實，不重跑查核、不建立新案件。", source_refs: ["sig_post_002", "sig_post_001"] },
+    3: { timeline_id: "tl_stage_3", case_version: 2, kind: "assessment_updated", occurred_at: "2026-07-01T01:40:00Z", summary: "獨立回報帶入福壽、中聯與批號，案件升為 high。", reason: "同一時間窗的新作者帶來新品牌、上游與批號，足以改變查核與追蹤計畫。", source_refs: ["sig_post_003", "clm_s3_fact_zhonglian"] },
+    4: { timeline_id: "tl_stage_4", case_version: 3, kind: "verification_updated", occurred_at: "2026-07-01T08:00:00Z", summary: "食藥署公告支持中聯批號超標與三個流向品牌。", reason: "官方證據把可處置範圍精確到品牌、品類與批號；三筆 confirmed 仍等待人工核可。", source_refs: ["sig_fda_20260701", "ev_s4_fda_20260701"] },
+    5: { timeline_id: "tl_stage_5", case_version: 4, kind: "assessment_updated", occurred_at: "2026-07-07T09:00:00Z", summary: "官方公告擴大到使用受影響原料的加工食品。", reason: "新增候選需要新的人工核可；上一輪已執行的三筆下架維持有效。", source_refs: ["sig_fda_20260707", "ev_s5_fda_20260707"] },
+    6: { timeline_id: "tl_stage_6", case_version: 5, kind: "verification_updated", occurred_at: "2026-07-23T09:04:00Z", summary: "部分批次獲放行，回放只排除模擬批號 315-1150411。", reason: "中央社證據反駁所有擴大列管批次仍有問題，但不支持恢復既有下架商品。", source_refs: ["sig_cna_20260723", "ev_s6_cna_20260723", "prod_009"] },
   };
   return { ...common, ...items[stage] };
 }
@@ -65,7 +65,7 @@ function buildPrimarySteps() {
     return {
       step_id: `stage_${stageNumber}`,
       sequence: stageNumber,
-      kind: stageNumber === 2 ? "verification" : stageNumber === 4 ? "approval" : stageNumber === 5 ? "assessment" : "signal_added",
+      kind: stageNumber === 2 ? "signal_added" : stageNumber === 4 ? "approval" : stageNumber === 5 ? "assessment" : "signal_added",
       title,
       summary,
       reason: current.priority_reasons[0],
@@ -78,19 +78,18 @@ function buildPrimarySteps() {
   });
 }
 
-function caseForStage(stage, { stage4Executed = false, productStatuses = null, status = null } = {}) {
+function caseForStage(stage) {
   const definition = stageDefinition(stage);
-  const statuses = productStatuses || productsAtStage(stage, { stage4Executed });
   return {
     case_id: PRIMARY_CASE_ID,
     version: definition.version,
     title: caseTitle(stage),
     ...definition,
-    status: status || definition.status,
+    status: definition.status,
     owner: { type: "case_agent", id: "agent_food_safety" },
     demo_stage: stage,
-    updated_at: stageTimelineItem(Math.max(stage, 1)).occurred_at,
-    candidate_products: definition.candidate_products.map((candidate) => ({ ...candidate, product_status: statuses[candidate.product_id] ?? "active" })),
+    updated_at: stageTimelineItem(stage === 2 ? 1 : Math.max(stage, 1)).occurred_at,
+    candidate_products: definition.candidate_products.map((candidate) => ({ ...candidate })),
   };
 }
 
@@ -112,7 +111,7 @@ function initialState({ stage = DEFAULT_STAGE, scenario = "main" } = {}) {
     demo_stage: selectedStage,
     demo_scenario: scenario === "failure_retry" ? "failure_retry" : "main",
     provenance: primaryProvenance(),
-    cases: [{ ...caseForStage(selectedStage, { stage4Executed }), updated_at: selectedStage ? stageTimelineItem(selectedStage).occurred_at : now() }],
+    cases: [{ ...caseForStage(selectedStage), updated_at: selectedStage ? stageTimelineItem(selectedStage === 2 ? 1 : selectedStage).occurred_at : now() }],
     signals: buildSignals(selectedStage),
     products,
     timelines: { [PRIMARY_CASE_ID]: timeline },
@@ -121,17 +120,17 @@ function initialState({ stage = DEFAULT_STAGE, scenario = "main" } = {}) {
     traces: [
       { trace_id: "trace_oil_main", name: "中聯油脂事件｜六段主線", description: "以核准的六段訊號、官方查核、人工核可與部分放行證據回放同一案件。", mode: "saved_mock", case_id: PRIMARY_CASE_ID, steps: buildPrimarySteps() },
       { trace_id: "trace_failure_retry", name: "模擬執行失敗｜隔離重試情境", description: "獨立展示一次性模擬平台失敗與同一 execution record 重試成功；不改變主線狀態。", mode: "saved_mock", case_id: PRIMARY_CASE_ID, steps: [
-        { step_id: "failure_01", sequence: 1, kind: "execution", title: "第一次執行失敗", summary: "模擬平台回傳暫時性錯誤，商品維持上架。", reason: "失敗保留在原執行紀錄中。", actor: { type: "simulation", id: "mock_platform" }, status: "failed", input_refs: ["prod_007"], case_before: { version: 5, status: "awaiting_approval" }, case_after: { version: 5, status: "awaiting_approval" } },
-        { step_id: "failure_02", sequence: 2, kind: "execution", title: "重試同一執行", summary: "第二次嘗試更新原 execution record，成功後不建立重複紀錄。", reason: "retry_of_activity_id 指回第一次失敗。", actor: { type: "simulation", id: "mock_platform" }, status: "succeeded", input_refs: ["prod_007"], case_before: { version: 5, status: "awaiting_approval" }, case_after: { version: 5, status: "actioned" } },
+        { step_id: "failure_01", sequence: 1, kind: "execution", title: "第一次執行失敗", summary: "模擬平台回傳暫時性錯誤，商品維持上架。", reason: "失敗保留在原執行紀錄中。", actor: { type: "simulation", id: "mock_platform" }, status: "failed", input_refs: ["prod_007"], case_before: { version: 4, status: "awaiting_approval" }, case_after: { version: 4, status: "awaiting_approval" } },
+        { step_id: "failure_02", sequence: 2, kind: "execution", title: "重試同一執行", summary: "第二次嘗試更新原 execution record，成功後不建立重複紀錄。", reason: "retry_of_activity_id 指回第一次失敗。", actor: { type: "simulation", id: "mock_platform" }, status: "succeeded", input_refs: ["prod_007"], case_before: { version: 4, status: "awaiting_approval" }, case_after: { version: 4, status: "actioned" } },
       ] },
     ],
     agent_status: {
       [PRIMARY_CASE_ID]: {
         case_id: PRIMARY_CASE_ID,
         agent_id: "agent_food_safety",
-        state: selectedStage === 4 || selectedStage === 5 ? "waiting_human" : selectedStage === 6 || selectedStage === 3 ? "waiting_follow_up" : "running",
+        state: selectedStage === 4 || selectedStage === 5 ? "waiting_human" : "waiting_follow_up",
         current_step: selectedStage === 4 ? "等待員工核可三筆 confirmed 商品" : selectedStage === 5 ? "等待新候選的獨立核可" : selectedStage === 6 ? "等待後續公告與商品層級證據" : "保存案件判斷並等待下一段證據",
-        latest_result: `已完成 Stage ${selectedStage} 回放狀態`,
+        latest_result: `已完成 Stage ${selectedStage === 2 ? 1 : selectedStage} 案件判讀`,
         waiting_reason: selectedStage === 4 ? "任何 listing 狀態改變前必須由商品安全營運人員核可" : selectedStage === 5 ? "prod_007、prod_009 是新候選，不繼承 Stage 4 核可" : selectedStage === 6 ? "部分放行不會自動恢復既有下架商品" : null,
         next_action: selectedStage < 6 ? `注入 Stage ${selectedStage + 1} 證據` : "等待官方後續公告或人工決定",
         observed_at: now(),
@@ -216,9 +215,9 @@ function richMainTrace(state) {
   const simulation = { type: "simulation", id: "mock_platform" };
   const phaseData = [
     { title: "Stage 1｜弱訊號建案", kind: "intake", actor: gatherer, summary: "保留 post_001 原文，建立 pending／medium 案件。", reason: "來源單一且為二手轉述，個人味道經驗不可升格成食安證據。", source: ["sig_post_001"], status: "completed", activity: traceActivity({ activity_id: "main.stage1.read", sequence: 1, kind: "read", title: "讀取原始貼文", summary: "保存三種陳述：推測、個人經驗與詢問。", reason: "弱訊號仍值得追蹤，但證據不足。", actor: gatherer, occurred_at: "2026-06-30T05:21:00Z", input: [traceField("source_id", "來源", "post_001", "sig_post_001")], output: [traceField("claim_types", "陳述類型", "hypothesis / experience / request")], source_refs: ["sig_post_001"] }) },
-    { title: "Stage 2｜純轉傳", kind: "verification", actor: caseAgent, summary: "保存 post_002 並連回 post_001，不重複查核。", reason: "repost 沒有新增獨立來源、新品牌、批號或可查核事實。", source: ["sig_post_002", "sig_post_001"], status: "completed", activity: traceActivity({ activity_id: "main.stage2.repost", sequence: 1, kind: "decision", title: "辨識 repost", summary: "把轉傳連回原始訊號。", reason: "不增加獨立來源數、不建立新案件。", actor: caseAgent, occurred_at: "2026-06-30T10:06:00Z", input: [traceField("source_relation", "來源關係", "repost"), traceField("duplicate_of", "原始來源", "post_001", "sig_post_001")], output: [traceField("action", "處理", "保存但略過重複查核")], source_refs: ["sig_post_002", "sig_post_001"] }) },
+    { title: "Stage 2｜純轉傳", kind: "signal_added", actor: caseAgent, summary: "保存 post_002 並連回 post_001，不重複查核。", reason: "repost 沒有新增獨立來源、新品牌、批號或可查核事實。", source: ["sig_post_002", "sig_post_001"], status: "completed", activity: traceActivity({ activity_id: "main.stage2.repost", sequence: 1, kind: "decision", title: "辨識 repost", summary: "把轉傳連回原始訊號。", reason: "不增加獨立來源數、不建立新案件。", actor: caseAgent, occurred_at: "2026-06-30T10:06:00Z", input: [traceField("source_relation", "來源關係", "repost"), traceField("duplicate_of", "原始來源", "post_001", "sig_post_001")], output: [traceField("action", "處理", "保存但略過重複查核")], source_refs: ["sig_post_002", "sig_post_001"] }) },
     { title: "Stage 3｜獨立回報升級", kind: "assessment", actor: caseAgent, summary: "新作者帶來福壽、中聯與 315-1150404，案件升為 risk／high。", reason: "新實體與批號改變查核與商品比對範圍。", source: ["sig_post_003"], status: "completed", activity: traceActivity({ activity_id: "main.stage3.assess", sequence: 1, kind: "tool", title: "更新案件判讀", summary: "把獨立回報與原始事件歸入同一案件。", reason: "同品類、同時間窗，且帶入新品牌、上游與批號。", actor: caseAgent, occurred_at: "2026-07-01T01:41:00Z", input: [traceField("source_id", "來源", "post_003", "sig_post_003")], output: [traceField("priority", "優先級", "high"), traceField("business_impact", "業務影響", "risk")], source_refs: ["sig_post_003", "clm_s3_fact_zhonglian"] }) },
-    { title: "Stage 4｜官方證實與人工核可", kind: "approval", actor: employee, summary: "官方證據將範圍精確到三筆 confirmed，回放在人工核可點停住。", reason: "confirmed 不等於 delisted；改變 listing 前一定要由人核可。", source: ["sig_fda_20260701", "ev_s4_fda_20260701"], status: "waiting_human", activity: traceActivity({ activity_id: "main.stage4.approval.wait", sequence: 1, kind: "wait", title: "等待人工選取三筆商品", summary: "只允許 prod_001、prod_003、prod_005 進入 Stage 4 核可。", reason: "prod_002 缺批號，不能因品牌相同被核可。", actor: employee, status: "waiting", occurred_at: "2026-07-01T08:01:00Z", started_at: "2026-07-01T08:01:00Z", completed_at: null, input: [traceField("case_version", "案件版本", 4, PRIMARY_CASE_ID), traceField("eligible_product_ids", "可核可商品", "prod_001, prod_003, prod_005")], output: [traceField("approval_id", "核可 ID", null)], source_refs: [PRIMARY_CASE_ID, "prod_001", "prod_003", "prod_005"] }), evidence: [traceEvidence("ev_s4_fda_20260701", "中聯油脂原料批號 315-1150404 檢驗與流向公告（demo 前需逐字核對）", "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379", "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0；流向福懋、福壽、泰山，首波 15 項油品下架。", "supports") ] },
+    { title: "Stage 4｜官方證實與人工核可", kind: "approval", actor: employee, summary: "官方證據將範圍精確到三筆 confirmed，回放在人工核可點停住。", reason: "confirmed 不等於 delisted；改變 listing 前一定要由人核可。", source: ["sig_fda_20260701", "ev_s4_fda_20260701"], status: "waiting_human", activity: traceActivity({ activity_id: "main.stage4.approval.wait", sequence: 1, kind: "wait", title: "等待人工選取三筆商品", summary: "只允許 prod_001、prod_003、prod_005 進入 Stage 4 核可。", reason: "prod_002 缺批號，不能因品牌相同被核可。", actor: employee, status: "waiting", occurred_at: "2026-07-01T08:01:00Z", started_at: "2026-07-01T08:01:00Z", completed_at: null, input: [traceField("case_version", "案件版本", 3, PRIMARY_CASE_ID), traceField("eligible_product_ids", "可核可商品", "prod_001, prod_003, prod_005")], output: [traceField("approval_id", "核可 ID", null)], source_refs: [PRIMARY_CASE_ID, "prod_001", "prod_003", "prod_005"] }), evidence: [traceEvidence("ev_s4_fda_20260701", "中聯油脂原料批號 315-1150404 檢驗與流向公告（demo 前需逐字核對）", "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379", "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0；流向福懋、福壽、泰山，首波 15 項油品下架。", "supports") ] },
     { title: "Stage 5｜範圍擴大", kind: "assessment", actor: caseAgent, summary: "加工食品成為新候選，prod_007 與 prod_009 保持 active 並等待新的核可。", reason: "Stage 4 核可只綁定當時案件版本與三個商品，不會自動延伸。", source: ["sig_fda_20260707", "ev_s5_fda_20260707"], status: "completed", activity: traceActivity({ activity_id: "main.stage5.expand", sequence: 1, kind: "tool", title: "重排新增候選", summary: "保留三筆既有 delisted，新增兩筆 active candidate。", reason: "新案件版本需要新的人工核可；主線不執行可選核可。", actor: caseAgent, occurred_at: "2026-07-07T09:01:00Z", input: [traceField("evidence_id", "證據", "ev_s5_fda_20260707", "ev_s5_fda_20260707")], output: [traceField("new_candidates", "新候選", "prod_007, prod_009"), traceField("prior_approval", "舊核可", "not inherited")], source_refs: ["sig_fda_20260707", "prod_007", "prod_009"] }), evidence: [traceEvidence("ev_s5_fda_20260707", "使用受影響原料製成食品擴大下架公告（demo 前需逐字核對）", "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634443", "下架範圍擴大為所有使用受影響原料製成之食品，不論使用比例；前一日公告已擴為 360 家、18 項產品、30 批號。", "supports") ] },
     { title: "Stage 6｜部分批次放行", kind: "verification", actor: caseAgent, summary: "部分批次獲放行，只把回放映射的 prod_009 改為 excluded。", reason: "反駁證據只縮小部分範圍；不恢復 315-1150404 的商品或既有 delisted 狀態。", source: ["sig_cna_20260723", "ev_s6_cna_20260723"], status: "completed", activity: traceActivity({ activity_id: "main.stage6.release", sequence: 1, kind: "decision", title: "縮小候選範圍", summary: "保留 prod_007 candidate，排除模擬批號 315-1150411 的 prod_009。", reason: "中央社報導反駁所有擴大列管批次仍有問題，但該批號映射是回放資料。", actor: caseAgent, occurred_at: "2026-07-23T09:05:00Z", input: [traceField("evidence_id", "證據", "ev_s6_cna_20260723", "ev_s6_cna_20260723")], output: [traceField("excluded_product", "排除商品", "prod_009"), traceField("priority", "優先級", "high")], source_refs: ["sig_cna_20260723", "prod_009"] }), evidence: [traceEvidence("ev_s6_cna_20260723", "中聯油脂案　食藥署公布可重新上架501項產品清單（demo 前需逐字核對）", "https://www.cna.com.tw/news/ahel/202607230245.aspx", "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品製成的 501 項產品列入可重新上架清單。", "refutes") ] },
   ];
@@ -275,7 +274,41 @@ function enrichState(state) {
   }
   state.stage4_executed_product_ids = [...new Set(state.stage4_executed_product_ids)];
   state.stage4_executed = STAGE4_REQUIRED_PRODUCT_IDS.every((productId) => state.stage4_executed_product_ids.includes(productId));
+  const expectedVersion = stageDefinition(state.demo_stage).version;
+  const oldVersion = state.cases?.[0]?.version;
+  const needsVersionMigration = state.schema_version < 3 && oldVersion > expectedVersion;
+  if (needsVersionMigration) {
+    const current = state.cases[0];
+    current.version = expectedVersion;
+    if (state.demo_stage === 2) {
+      Object.assign(current, stageDefinition(2), { updated_at: stageTimelineItem(1).occurred_at });
+    }
+    for (const item of state.timelines?.[PRIMARY_CASE_ID] ?? []) {
+      if (item.timeline_id === "tl_stage_2") {
+        item.case_version = 1;
+        item.kind = "signal_added";
+      } else if (item.case_version > 1) {
+        item.case_version -= 1;
+      }
+    }
+    for (const approval of state.approvals ?? []) {
+      if (approval.case_version > 1) approval.case_version -= 1;
+    }
+    // Old cached mutation responses contain pre-migration versions. Replaying
+    // them would contradict the migrated Case and approval records.
+    state.idempotency = {};
+  }
+  for (const current of state.cases ?? []) {
+    for (const candidate of current.candidate_products ?? []) delete candidate.product_status;
+  }
   state.traces.forEach((trace) => {
+    if (trace.trace_id === "trace_oil_main") trace.steps = buildPrimarySteps();
+    if (needsVersionMigration && trace.trace_id === "trace_failure_retry" && Array.isArray(trace.steps)) {
+      for (const step of trace.steps) {
+        if (step.case_before?.version > 1) step.case_before.version -= 1;
+        if (step.case_after?.version > 1) step.case_after.version -= 1;
+      }
+    }
     const rich = trace.trace_id === "trace_oil_main" ? richMainTrace(state) : trace.trace_id === "trace_failure_retry" ? richFailureRetryTrace(state) : null;
     if (rich) Object.assign(trace, rich);
   });
@@ -297,7 +330,7 @@ async function readState(statePath) {
   try {
     const content = await fs.readFile(statePath, "utf8");
     const parsed = JSON.parse(content);
-    if (!parsed || parsed.dataset_id !== PRIMARY_DATASET_ID || ![1, CURRENT_SCHEMA_VERSION].includes(parsed.schema_version)) {
+    if (!parsed || parsed.dataset_id !== PRIMARY_DATASET_ID || ![1, 2, CURRENT_SCHEMA_VERSION].includes(parsed.schema_version)) {
       await preserveLegacyState(statePath);
       const fresh = initialState();
       await writeState(statePath, fresh);
@@ -373,14 +406,21 @@ function addTimeline(state, caseId, kind, summary, reason, sourceRefs, actor) {
 
 function caseSummary(item, state) {
   const agent = state.agent_status[item.case_id] || null;
-  return { ...clone(item), latest_change: state.timelines[item.case_id]?.at(-1)?.summary ?? null, next_check_at: item.monitoring_plan?.next_check_at ?? null, agent_state: agent?.state ?? null };
+  const latest = state.timelines[item.case_id]?.at(-1);
+  return {
+    case_id: item.case_id, version: item.version, demo_stage: item.demo_stage,
+    title: item.title, status: item.status, business_impact: item.business_impact,
+    priority: item.priority, priority_reasons: clone(item.priority_reasons), owner: clone(item.owner),
+    latest_change: latest?.summary ?? null, updated_at: latest?.occurred_at ?? item.updated_at,
+    next_check_at: item.monitoring_plan?.next_check_at ?? null, agent_state: agent?.state ?? null,
+  };
 }
 
 function refreshAgent(state) {
   const stage = state.demo_stage;
   const agent = state.agent_status[PRIMARY_CASE_ID];
   if (!agent) return;
-  agent.state = stage === 4 || stage === 5 ? "waiting_human" : stage === 6 || stage === 3 ? "waiting_follow_up" : "running";
+  agent.state = stage === 4 || stage === 5 ? "waiting_human" : "waiting_follow_up";
   agent.current_step = stage === 4 ? "等待員工核可三筆 confirmed 商品" : stage === 5 ? "等待新候選的獨立核可" : stage === 6 ? "等待後續公告與商品層級證據" : `已完成 Stage ${stage}，等待下一段證據`;
   agent.latest_result = `已完成 Stage ${stage} 回放狀態`;
   agent.waiting_reason = stage === 4 ? "任何 listing 狀態改變前必須由商品安全營運人員核可" : stage === 5 ? "prod_007、prod_009 是新候選，不繼承 Stage 4 核可" : stage === 6 ? "部分放行不會自動恢復既有下架商品" : null;
@@ -438,8 +478,6 @@ function executeApproval(state, approval) {
       succeeded += 1;
       addTimeline(state, approval.case_id, "action_executed", `${product.name} 已完成模擬下架。`, "使用者核可的商品與案件版本有效。", [execution.execution_id], { type: "simulation", id: "mock_platform" });
     }
-    const candidate = current.candidate_products?.find((item) => item.product_id === productId);
-    if (candidate) candidate.product_status = product.status;
     executions.push(execution);
   }
   if (succeeded > 0) current.status = "actioned";
@@ -457,8 +495,15 @@ function executeApproval(state, approval) {
 
 function applyStage(state, nextStage) {
   const current = findCase(state, PRIMARY_CASE_ID);
+  if (nextStage === 2) {
+    current.demo_stage = 2;
+    state.demo_stage = 2;
+    state.signals = buildSignals(2);
+    state.timelines[PRIMARY_CASE_ID].push(stageTimelineItem(2));
+    return;
+  }
   const stage4Executed = state.stage4_executed === true;
-  const next = caseForStage(nextStage, { stage4Executed });
+  const next = caseForStage(nextStage);
   Object.assign(current, next, { updated_at: now() });
   state.demo_stage = nextStage;
   state.signals = buildSignals(nextStage);

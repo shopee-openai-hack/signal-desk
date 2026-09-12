@@ -42,9 +42,12 @@ curl -fsS -X POST http://localhost:4100/api/v1/mock/reset \
   -H 'content-type: application/json' -d '{"stage":3,"confirm":true}'
 ```
 
-若要接目前 FastAPI starter，使用原本的 `npm run dev`；它會把相同相對 API
-proxy 到 `http://localhost:8000`。目前 FastAPI 尚未提供案件工作流 endpoints，
-因此四頁的完整互動應以 `dev:mock` 驗證。
+若要接目前 FastAPI，使用原本的 `npm run dev`；它會把相同相對 API proxy 到
+`http://localhost:8000`。A+B 已提供訊號、案件列表／詳情／時間軸、專員觀測、
+ingest、verify 與 versioned advance。商品目錄、核可／執行、Trace 讀取及六段
+回放控制器仍只有 Node mock 路徑，因此四頁完整 demo 請用 `dev:mock`。
+前端的「下一段證據」按鈕只在 mock 模式顯示；真實 FastAPI 的 advance 必須由
+控制器帶入 `expected_version` 與 A 已保存的 `verification_updates`。
 
 ## 頁面與互動
 
@@ -78,11 +81,11 @@ model 與 producer／consumer 對照見
 | POST | `/api/v1/approvals/{approval_id}/execute` | 執行核可的模擬下架 |
 | POST | `/api/v1/cases/{case_id}/advance` | 新證據造成版本變更（契約列出的 provisional B endpoint） |
 
-下列 endpoints 是為了前端在後端並行期間可展示而加入的 **mock-only provisional
-read model**，不能視為中央契約已完成：
+下列 read models 原先由 mock 提案，現在已列入中央契約；各 producer 的實作
+狀態分別標示：
 
-- `GET /api/v1/signals`：收件匣 read model；中央契約目前只有 ingest POST。
-- `GET /api/v1/cases/{case_id}/agent-status`：已保存的專員觀測；不是常駐 agent 或即時執行證明。
+- `GET /api/v1/signals`：收件匣 read model；A+B 已在 FastAPI 實作。
+- `GET /api/v1/cases/{case_id}/agent-status`：已保存的專員觀測；A+B 已在 FastAPI 實作，不是常駐 agent 或即時執行證明。
 - `GET /api/v1/cases/{case_id}/approvals`：前端 reload 後讀取保存核可與 execution 結果。
 - `GET /api/v1/traces`、`GET /api/v1/traces/{trace_id}`：保存 trace snapshot，只讀播放。
 - `POST /api/v1/mock/reset`：明確指定 Stage 0 或 Stage 3 重建 mock state；有核可／執行紀錄時需 `confirm: true`。
@@ -90,6 +93,11 @@ read model**，不能視為中央契約已完成：
 所有寫入（reset 除外）要求 `Idempotency-Key`；重複 key 會 replay 同一 response。
 案件版本不符回傳 `409 version_conflict`，錯誤格式維持中央契約的
 `{"error":{"code":"...","message":"...","details":{}}}`。
+
+Stage 是回放游標，與案件 `version` 分開。Stage 2 的純轉傳新增收件匣訊號與
+`signal_added` 時間軸紀錄，案件判讀仍是 v1；Stage 3–6 對應 v2–v5。
+升級前的 mock state 會遷移案件、時間軸與核可版本，保留執行與商品狀態；
+舊格式的 mutation response 快取會清除，以免重播錯誤版本。
 
 ## 六段回放與人工邊界
 

@@ -1,5 +1,18 @@
 # Frontend sync — 2026-09-12
 
+## Current integration checkpoint
+
+The notes below record C's earlier handoff and include historical branch and
+test status. The current `main` contains A+B's FastAPI ingest, verify, Case,
+timeline, inbox and saved agent-status endpoints together with C's four-page
+UI and rich vertical Trace reader. The full six-stage presentation still runs
+through the separate Node mock; FastAPI has no product approval/execution,
+saved Trace producer or replay controller yet. The mock now treats Stage 2 as
+a pure repost (`signal_added`, Case v1 unchanged); Stages 3–6 use Case v2–v5.
+The UI exposes the reason-only replay action only in mock mode and uses
+`demo_stage` for Stage 4 product eligibility. A stale approval blocks its own
+execution but does not block creating a fresh approval for Stage 5 products.
+
 ## 可用基準
 
 - Branch：`frontend`；基準 commit：`e9903e2`（四頁、HTTP mock 與前端文件）。本次收尾將連同後續修改推送 `origin/frontend`；未部署。

@@ -61,6 +61,7 @@ test("default checkpoint serves the approved primary fixture parity", async () =
   assert.match(status.body.provenance.warning, /demo 前需逐字核對/);
   assert.equal(cases.body.items.length, 1);
   assert.equal(cases.body.items[0].case_id, CASE_ID);
+  assert.equal("candidate_products" in cases.body.items[0], false);
   assert.deepEqual([cases.body.items[0].business_impact, cases.body.items[0].priority, cases.body.items[0].status], ["risk", "high", "investigating"]);
   assert.equal(signals.body.items.length, 3);
   assert.deepEqual(signals.body.items.map((item) => item.source.source_id), ["post_001", "post_002", "post_003"]);
@@ -109,10 +110,21 @@ test("full Stage 0 to 6 path enforces the Stage 4 human gate and never restores 
   assert.deepEqual((await request(url, "/api/v1/cases")).body.items, []);
   assert.deepEqual((await request(url, "/api/v1/signals")).body.items, []);
   assert.equal((await readProducts(url)).length, 9);
+  let stageOne;
   for (const stage of [1, 2, 3]) {
     const advanced = await request(url, `/api/v1/cases/${CASE_ID}/advance`, jsonPost(`advance-${stage}`));
     assert.equal(advanced.response.status, 200);
     assert.equal(advanced.body.stage, stage);
+    if (stage === 1) stageOne = advanced.body.case;
+    if (stage === 2) {
+      assert.equal(advanced.body.case.version, 1);
+      assert.equal(advanced.body.case.updated_at, stageOne.updated_at);
+      assert.deepEqual(advanced.body.case.claim_ids, stageOne.claim_ids);
+      const timeline = (await request(url, `/api/v1/cases/${CASE_ID}/timeline`)).body.items;
+      assert.equal(timeline[1].kind, "signal_added");
+      assert.equal(timeline[1].case_version, 1);
+      assert.equal((await request(url, "/api/v1/cases")).body.items[0].updated_at, timeline[1].occurred_at);
+    }
   }
   assert.deepEqual([ (await readCase(url)).business_impact, (await readCase(url)).priority, (await readCase(url)).status ], ["risk", "high", "investigating"]);
 
@@ -121,17 +133,17 @@ test("full Stage 0 to 6 path enforces the Stage 4 human gate and never restores 
   assert.equal((await readProducts(url)).every((item) => item.status === "active"), true);
   assert.deepEqual(stage4.body.case.candidate_products.filter((item) => item.relation === "confirmed").map((item) => item.product_id), ["prod_001", "prod_003", "prod_005"]);
 
-  const unknown = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-unknown", { case_version: 4, product_ids: ["prod_002"] }));
+  const unknown = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-unknown", { case_version: 3, product_ids: ["prod_002"] }));
   assert.equal(unknown.response.status, 422);
   assert.equal(unknown.body.error.code, "invalid_selection");
-  const approval = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stage4", { case_version: 4, product_ids: ["prod_001", "prod_003", "prod_005"] }));
+  const approval = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stage4", { case_version: 3, product_ids: ["prod_001", "prod_003", "prod_005"] }));
   assert.equal(approval.response.status, 201);
   assert.equal((await readProducts(url)).every((item) => item.status === "active"), true);
   const execution = await request(url, `/api/v1/approvals/${approval.body.approval.approval_id}/execute`, jsonPost("execute-stage4"));
   assert.equal(execution.response.status, 200);
   assert.deepEqual(execution.body.summary, { succeeded: 3, failed: 0, total: 3 });
   assert.deepEqual((await readProducts(url)).filter((item) => item.status === "delisted").map((item) => item.product_id), ["prod_001", "prod_003", "prod_005"]);
-  assert.deepEqual((await readCase(url)).candidate_products.filter((item) => item.product_status === "delisted").map((item) => item.product_id), ["prod_001", "prod_003", "prod_005"]);
+  assert.equal((await readCase(url)).candidate_products.every((item) => !("product_status" in item)), true);
 
   const stage5 = await request(url, `/api/v1/cases/${CASE_ID}/advance`, jsonPost("advance-5"));
   assert.equal(stage5.body.case.status, "awaiting_approval");
@@ -164,13 +176,41 @@ test("trace reads are read-only and primary state migration preserves mutable re
   assert.equal((await request(migrated.url, "/api/v1/traces/trace_oil_main")).body.phases.length, 6);
   assert.equal((await readProducts(migrated.url)).find((item) => item.product_id === "prod_001").status, "delisted");
   assert.equal((await request(migrated.url, `/api/v1/cases/${CASE_ID}/approvals`)).body.items[0].approval_id, "apr_legacy");
-  assert.equal(JSON.parse(await readFile(service.statePath, "utf8")).schema_version, 2);
+  assert.equal(JSON.parse(await readFile(service.statePath, "utf8")).schema_version, 3);
+});
+
+test("v2 mock state migrates repost and approval versions without losing execution history", async () => {
+  const service = await fixtureServer();
+  await resetToStage(service.url, 4);
+  const approved = await request(service.url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("old-approval", { case_version: 3, product_ids: ["prod_001"] }));
+  await request(service.url, `/api/v1/approvals/${approved.body.approval.approval_id}/execute`, jsonPost("old-execution"));
+  await new Promise((resolve) => service.server.close(resolve));
+  const legacy = JSON.parse(await readFile(service.statePath, "utf8"));
+  legacy.schema_version = 2;
+  legacy.cases[0].version = 4;
+  legacy.approvals[0].case_version = 4;
+  for (const item of legacy.timelines[CASE_ID]) {
+    if (item.timeline_id === "tl_stage_2") {
+      item.case_version = 2;
+      item.kind = "verification_updated";
+    } else if (item.case_version > 1) item.case_version += 1;
+  }
+  await writeFile(service.statePath, `${JSON.stringify(legacy, null, 2)}\n`, "utf8");
+  const migrated = await createMockServer({ statePath: service.statePath });
+  running.push({ ...migrated, dir: service.dir });
+  assert.equal((await readCase(migrated.url)).version, 3);
+  const timeline = (await request(migrated.url, `/api/v1/cases/${CASE_ID}/timeline`)).body.items;
+  assert.deepEqual([timeline[1].kind, timeline[1].case_version], ["signal_added", 1]);
+  const approvals = (await request(migrated.url, `/api/v1/cases/${CASE_ID}/approvals`)).body.items;
+  assert.equal(approvals[0].case_version, 3);
+  assert.equal(approvals[0].executions[0].status, "succeeded");
+  assert.equal((await readProducts(migrated.url)).find((item) => item.product_id === "prod_001").status, "delisted");
 });
 
 test("approval and execution idempotency persist across restart", async () => {
   const service = await fixtureServer();
   await resetToStage(service.url, 4);
-  const options = { case_version: 4, product_ids: ["prod_001"] };
+  const options = { case_version: 3, product_ids: ["prod_001"] };
   const firstApproval = await request(service.url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stable-key", options));
   const secondApproval = await request(service.url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stable-key", options));
   assert.equal(firstApproval.response.status, 201);
@@ -192,11 +232,11 @@ test("approval and execution idempotency persist across restart", async () => {
 test("stale Stage 4 approval is rejected after advancing to Stage 5", async () => {
   const { url } = await fixtureServer();
   await resetToStage(url, 4);
-  const approved = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stale-key", { case_version: 4, product_ids: ["prod_001", "prod_003", "prod_005"] }));
+  const approved = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-stale-key", { case_version: 3, product_ids: ["prod_001", "prod_003", "prod_005"] }));
   const approvalId = approved.body.approval.approval_id;
   await request(url, `/api/v1/approvals/${approvalId}/execute`, jsonPost("execute-stale-key"));
   const advanced = await request(url, `/api/v1/cases/${CASE_ID}/advance`, jsonPost("advance-stale-key"));
-  assert.equal(advanced.body.case.version, 5);
+  assert.equal(advanced.body.case.version, 4);
   const execution = await request(url, `/api/v1/approvals/${approvalId}/execute`, jsonPost("execute-stale-again-key"));
   assert.equal(execution.response.status, 409);
   assert.equal(execution.body.error.code, "version_conflict");
@@ -205,7 +245,7 @@ test("stale Stage 4 approval is rejected after advancing to Stage 5", async () =
 test("isolated failure scenario retries the same execution record", async () => {
   const { url } = await fixtureServer();
   await resetToStage(url, 5, "failure_retry");
-  const approved = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-retry-key", { case_version: 5, product_ids: ["prod_007"] }));
+  const approved = await request(url, `/api/v1/cases/${CASE_ID}/approvals`, jsonPost("approval-retry-key", { case_version: 4, product_ids: ["prod_007"] }));
   assert.equal(approved.response.status, 201);
   const approvalId = approved.body.approval.approval_id;
   const failed = await request(url, `/api/v1/approvals/${approvalId}/execute`, jsonPost("execute-fail-key"));

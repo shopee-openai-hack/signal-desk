@@ -107,7 +107,7 @@ function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void 
 
 function Header({ route, onNavigate, mockStatus }: { route: Route; onNavigate: (path: string) => void; mockStatus: MockStatus | undefined }) {
   const title = route.page === "inbox" ? "訊號收件匣" : route.page === "trace" ? "Trace 回放" : route.page === "case" ? "案件詳情" : "案件列表";
-  return <header className="sticky top-0 z-10 flex min-h-[74px] items-center justify-between border-b border-stone-200/80 bg-[#f8f8f5]/90 px-8 backdrop-blur"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div><div className="flex items-center gap-3"><Pill tone="orange"><span className="mr-1.5 size-1.5 rounded-full bg-orange-500" />Mock 模式</Pill>{mockStatus && <Pill tone="neutral">Stage {mockStatus.stage} / 6</Pill>}{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
+  return <header className="sticky top-0 z-10 flex min-h-[74px] items-center justify-between border-b border-stone-200/80 bg-[#f8f8f5]/90 px-8 backdrop-blur"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div><div className="flex items-center gap-3">{mockStatus && <><Pill tone="orange"><span className="mr-1.5 size-1.5 rounded-full bg-orange-500" />Mock 模式</Pill><Pill tone="neutral">Stage {mockStatus.stage} / 6</Pill></>}{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
 }
 
 function Sidebar({ route, onNavigate }: { route: Route; onNavigate: (path: string) => void }) {
@@ -126,7 +126,7 @@ function InboxPage({ signals, isLoading, isError, onRetry, onNavigate }: { signa
   return <div className="space-y-6"><div><p className="text-sm text-stone-500">原始訊號</p><h2 className="mt-1 text-xl font-semibold text-stone-900">從來源找到案件脈絡</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">保留來源、原文與查核狀態。轉傳會連回原始訊號，不會因為內容相似就重複派工。</p></div>{isError && <ErrorNotice error={new Error("訊號收件匣讀取失敗。請確認 mock service 已啟動。")} onRetry={onRetry} />}{isLoading && <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入訊號…</div>}<div className="space-y-3">{signals?.map((signal) => <Panel key={signal.signal_id} className="p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-700"><FileText className="size-4" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Pill tone={signal.source_relation === "repost" ? "neutral" : "blue"}>{signal.source_relation === "repost" ? "重複轉傳" : signal.source_relation === "independent_report" ? "獨立回報" : "原始來源"}</Pill><span className="text-xs text-stone-400">{signal.source.provider} · {formatDate(signal.source.published_at)}</span></div><p className="mt-3 text-sm leading-6 text-stone-800">{signal.source.raw_text}</p></div></div>{signal.case_id ? <button type="button" onClick={() => onNavigate(`/cases/${signal.case_id}/overview`)} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 hover:border-orange-300 hover:text-orange-800">查看案件<ArrowRight className="size-4" /></button> : <span className="text-xs text-stone-500">尚未歸案</span>}</div><div className="mt-4 border-t border-stone-100 pt-4"><div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-stone-500"><span>訊號 ID：{signal.signal_id}</span>{signal.duplicate_of_signal_id && <span>原始訊號：{signal.duplicate_of_signal_id}</span>}<span>案件：{signal.case_id ?? "尚未歸案"}</span></div><div className="mt-3 flex flex-wrap gap-2">{signal.claims.map((claim) => <Pill key={claim.claim_id} tone={statusTone(claim.verification_status)}>{claim.kind} · {statusLabel(claim.verification_status)}</Pill>)}</div></div></Panel>)}</div>{!isLoading && !isError && !signals?.length && <EmptyState title="收件匣是空的" message="目前沒有可展示的原始訊號。" />}</div>;
 }
 
-function AgentPanel({ agent, onAdvance, isAdvancing }: { agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean }) {
+function AgentPanel({ agent, onAdvance, isAdvancing, isMock }: { agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean; isMock: boolean }) {
   if (!agent) {
     return (
       <Panel className="p-5 shadow-none">
@@ -171,18 +171,18 @@ function AgentPanel({ agent, onAdvance, isAdvancing }: { agent: AgentStatus | un
           <dd className="mt-1 leading-6 text-stone-700">{agent.next_action ?? "尚未安排"}</dd>
         </div>
       </dl>
-      <div className="mt-5 border-t border-stone-100 pt-4">
+      {isMock && <div className="mt-5 border-t border-stone-100 pt-4">
         <Button type="button" variant="outline" size="sm" onClick={onAdvance} disabled={isAdvancing} className="border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900">
           <RotateCcw className={`size-3.5 ${isAdvancing ? "animate-spin" : ""}`} />
           模擬收到新證據（mock）
         </Button>
-        <p className="mt-2 text-xs leading-5 text-stone-500">案件版本會加一，舊核可將被阻擋。</p>
-      </div>
+        <p className="mt-2 text-xs leading-5 text-stone-500">新證據可能更新案件版本；純轉傳只記入時間軸。</p>
+      </div>}
     </Panel>
   );
 }
 
-function OverviewTab({ current, signals, agent, onAdvance, isAdvancing }: { current: CaseSnapshot; signals: Signal[] | undefined; agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean }) {
+function OverviewTab({ current, signals, agent, onAdvance, isAdvancing, isMock }: { current: CaseSnapshot; signals: Signal[] | undefined; agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean; isMock: boolean }) {
   const claims = signals?.flatMap((signal) => signal.claims.filter((claim) => current.claim_ids.includes(claim.claim_id))) ?? [];
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -259,7 +259,7 @@ function OverviewTab({ current, signals, agent, onAdvance, isAdvancing }: { curr
         </Panel>
       </div>
       <div>
-        <AgentPanel agent={agent} onAdvance={onAdvance} isAdvancing={isAdvancing} />
+        <AgentPanel agent={agent} onAdvance={onAdvance} isAdvancing={isAdvancing} isMock={isMock} />
       </div>
     </div>
   );
@@ -330,13 +330,13 @@ function ProductsTab({ current, products, approvals, onInvalidate, queryError }:
               </TableRow>
             </TableHeader>
             <TableBody>
-              {current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || Boolean(approvalStale) || (current.version === 4 && candidate.relation !== "confirmed")} onToggle={() => toggle(candidate.product_id)} />)}
+              {current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || (current.demo_stage === 4 && candidate.relation !== "confirmed")} onToggle={() => toggle(candidate.product_id)} />)}
             </TableBody>
           </Table>
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-5">
           <p className="text-sm text-stone-500">已選 {selected.length} 項 · 新增商品不會沿用舊核可</p>
-          <Button type="button" disabled={selected.length === 0 || createApproval.isPending || Boolean(approvalStale)} onClick={() => createApproval.mutate()}>
+          <Button type="button" disabled={selected.length === 0 || createApproval.isPending} onClick={() => createApproval.mutate()}>
             <Check className="size-4" />
             {createApproval.isPending ? "建立核可中…" : "確認核可選取商品"}
           </Button>
@@ -481,7 +481,7 @@ function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProducts
       </TabsList>
 
       {advance.error && <ErrorNotice error={advance.error} />}
-      {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} />}
+      {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} isMock={mockStatus?.mode === "mock"} />}
       {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["mock-status"] }); }} queryError={approvals.error} />}</>}
       {tab === "timeline" && (timeline.isLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入時間軸…</div> : timeline.isError ? <ErrorNotice error={timeline.error} onRetry={() => timeline.refetch()} /> : <TimelineTab timeline={timeline.data?.items} />)}
       </Tabs>
@@ -496,7 +496,7 @@ export default function App() {
   const cases = useQuery({ queryKey: ["cases"], queryFn: api.listCases });
   const mockStatus = useQuery({ queryKey: ["mock-status"], queryFn: api.getMockStatus });
   const signals = useQuery({ queryKey: ["signals"], queryFn: api.getSignals, enabled: route.page === "inbox" || route.page === "case" });
-  const products = useQuery({ queryKey: ["products"], queryFn: api.getProducts, enabled: route.page === "case" });
+  const products = useQuery({ queryKey: ["products"], queryFn: api.getProducts, enabled: route.page === "case" && route.tab === "products" });
   const selectedCase = route.page === "case" ? route.caseId : undefined;
   return <div className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} /><div className="lg:pl-[248px]"><Header route={route} onNavigate={navigate} mockStatus={mockStatus.data} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} mockStatus={mockStatus.data} />}</main></div></div>;
 }
