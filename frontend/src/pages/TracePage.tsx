@@ -20,7 +20,6 @@ import {
   Search,
   SkipBack,
   SkipForward,
-  Sparkles,
   StepForward,
   UserRound,
   Wrench,
@@ -357,7 +356,7 @@ function PhaseDetails({ phase, allActivitiesRevealed, statusLabel }: { phase: Tr
       <p className="mt-1 text-sm leading-6 text-stone-700">{change.line}</p>
       <details className="group mt-1">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 py-2 text-sm text-stone-600 hover:text-stone-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
-          <ChevronRight className="size-3.5 group-open:rotate-90" />比較完整案件快照
+          <ChevronRight className="size-3.5 group-open:rotate-90" />處理前後比較
         </summary>
         <div className="pb-2"><SnapshotComparison before={change.before} after={change.after} statusLabel={statusLabel} /></div>
       </details>
@@ -424,9 +423,9 @@ function PhaseTimeline({ phases, focus, revealedPhaseCount, revealedActivities, 
                   {expanded && (
                     <div className="mt-3 border-t border-stone-200 pt-3">
                       <p className="max-w-[70ch] text-sm leading-6 text-stone-700"><span className="font-medium text-stone-900">判斷依據：</span>{phase.reason}</p>
-                      <section className="mt-4 pl-3" aria-label="Agent 活動">
+                      <section className="mt-4 pl-3" aria-label="處理紀錄">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <h4 className="text-xs font-medium text-stone-500">Agent 活動</h4>
+                          <h4 className="text-xs font-medium text-stone-500">處理紀錄</h4>
                           <span className="text-xs text-stone-500">{actorLabel(phase.actor.id)}</span>
                         </div>
                         <div className="mt-1">
@@ -657,7 +656,6 @@ export function TracePage({ onNavigate, Pill, Panel, ErrorNotice, statusLabel, s
                 {scenarios.map((item) => <option key={item.trace_id} value={item.trace_id}>{item.name}</option>)}
               </select>
             </label>
-            <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3.5" />{trace.data.mode === "saved_mock" ? "合成 mock · 唯讀" : `${trace.data.mode} · 唯讀`}</span>
           </div>
           {phases.length ? (
             <RichTraceReplay trace={trace.data} phases={phases} Pill={Pill} Panel={Panel} statusLabel={statusLabel} statusTone={statusTone} onNavigate={onNavigate} />
