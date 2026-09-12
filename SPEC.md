@@ -469,12 +469,14 @@ controlled-replay portion of those questions.
 
 These items require coordination but do not block drafting A's internal implementation:
 
-1. B must implement the shared Pydantic `Signal`, `Claim` and `Evidence` models before
-   final integration.
+1. A may author the first shared Pydantic `Signal`, `Claim` and `Evidence` models from
+   the existing central contract. B remains the contract steward and must review and
+   accept them before final integration; A must not create a parallel private model.
 2. The Case contract currently lists `claim_ids` but not all `signal_ids`. B must decide
    how a Case exposes pure reposts and other Signals that add no Claim.
-3. D must deliver the exact staged posts, evidence documents and expected business
-   interpretations described in `issues/01a-synthesized-data-handoff.md`.
+3. D has approved the handoff design and must still deliver the exact staged posts,
+   evidence documents and expected business interpretations described in
+   `issues/01a-synthesized-data-handoff.md`.
 4. B must confirm the request and response bodies for `/api/v1/cases/dispatch` and
    `/api/v1/claims/{claim_id}/verify`; this spec defines the required service semantics.
 5. An explicit `mixed` verification status is deferred unless B coordinates a central

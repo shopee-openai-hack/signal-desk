@@ -36,22 +36,63 @@ Shared constraints for every task:
 
 These are coordination requirements, not A implementation tasks.
 
-### Gate B0 — shared contract readiness
+### Gate B0 — shared contract acceptance
 
-B must provide importable Pydantic models for `Signal`, `Claim` and `Evidence`, and
-confirm the request semantics for case dispatch and claim verification. B must also
-decide how a Case exposes all related Signals, including pure reposts with no new
-Claim; `signal_ids` is the current recommendation.
+B remains the central contract steward, but A may author the initial Pydantic
+`Signal`, `Claim` and `Evidence` models in Task A0 and send them to B for review. B
+must accept those shared models and confirm the request semantics for case dispatch
+and claim verification. B must also decide how a Case exposes all related Signals,
+including pure reposts with no new Claim; `signal_ids` is the current recommendation.
 
-Until this gate lands, A tasks may build adapters and injected model-call logic, but
-must not invent competing canonical models.
+Until B accepts the proposal, A tasks may build against Task A0 on this branch, but
+final A/B integration must not be claimed and no competing canonical model may be
+introduced.
 
 ### Gate D0 — scenario pack
 
 D must provide the exact staged synthesized posts, Evidence documents and expected
 business interpretation described in `issues/01a-synthesized-data-handoff.md`.
-Placeholders may be used for unit tests, but M1 acceptance cannot be claimed until
-the shared D pack is installed and reviewed.
+The D owner has approved the handoff design. Placeholders may be used for unit tests,
+but M1 acceptance cannot be claimed until the actual shared D pack is installed and
+reviewed.
+
+## Task A0 — canonical Signal contract models
+
+### Goal
+
+Turn the existing `contracts/README.md` Signal, Claim and Evidence definitions into
+one importable set of shared Pydantic models for A to produce and B to consume.
+
+### Owned files
+
+```text
+app/schemas.py
+tests/test_signal_contract_models.py
+```
+
+Do not add or modify Case, Product, Approval or Execution semantics in this task.
+
+### Work
+
+- Add `Source`, `Entity`, `ClaimScope`, `Evidence`, `Claim` and `Signal` models using
+  the existing canonical field names and enums.
+- Preserve existing starter planner schemas and behavior.
+- Use strict validation for forbidden extra fields, timezone-aware UTC timestamps,
+  Claim-to-Signal IDs and Evidence-to-Claim IDs.
+- Enforce the existing rule that `supported` and `refuted` Claims cite at least one
+  Evidence item; do not add a `mixed` enum.
+- Add focused model validation and JSON round-trip tests.
+- Present the resulting diff to B for contract review; do not create an A-only copy
+  of these models in another module.
+
+### Done when
+
+- The example Signal in `contracts/README.md` validates unchanged.
+- Invalid enums, missing required fields, naïve timestamps and inconsistent nested
+  IDs are rejected.
+- Existing planner schema tests remain valid.
+- `uv run pytest tests/test_signal_contract_models.py` passes.
+- B has been given the exact diff and confirms it as the shared model baseline.
 
 ## Task A1 — synthesized dataset loader
 
@@ -102,7 +143,7 @@ idempotency and explicit repost semantics.
 
 ### Dependencies
 
-- Gate B0 for canonical model imports.
+- Task A0 for canonical model imports; Gate B0 is required before final integration.
 
 ### Owned files
 
@@ -146,7 +187,7 @@ units without over-splitting or inventing scope.
 
 ### Dependencies
 
-- Gate B0 for canonical Claim construction.
+- Task A0 for canonical Claim construction; Gate B0 is required before final integration.
 
 ### Owned files
 
@@ -189,7 +230,7 @@ supplied synthesized Evidence and persists no unsupported verdict.
 
 ### Dependencies
 
-- Gate B0 for canonical Claim and Evidence imports.
+- Task A0 for canonical Claim and Evidence imports; Gate B0 is required before final integration.
 - Task A1's Evidence loader interface.
 
 ### Owned files
@@ -231,7 +272,7 @@ and hand each newly analyzed Signal to B exactly once.
 
 ### Dependencies
 
-- Gate B0.
+- Task A0 and Gate B0.
 - Tasks A1–A4.
 
 ### Owned files
@@ -275,7 +316,7 @@ pipeline is integrated.
 
 ### Dependencies
 
-- Gate B0.
+- Task A0 and Gate B0.
 - Gate D0 for final acceptance content.
 
 ### Owned files
@@ -317,7 +358,7 @@ A/B handoff without changing business decisions owned by B.
 ### Dependencies
 
 - Gates B0 and D0.
-- Tasks A1–A6.
+- Tasks A0–A6.
 
 ### Owned files
 
@@ -355,12 +396,15 @@ acceptance.
 
 ### Required before final M1 acceptance
 
-1. Identify the D owner and obtain approval of the exact staged source/evidence pack.
-2. Ask B to land the shared Pydantic models and decide how Cases expose Signals that
-   contain no new Claim.
+1. D has approved the handoff design; obtain the actual staged source/evidence pack
+   and its expected interpretations.
+2. Send Task A0's shared Pydantic model diff to B for acceptance, and ask B to decide
+   how Cases expose Signals that contain no new Claim.
 3. Ask B to confirm the exact dispatch and verify request/response bodies.
-4. Confirm whether the existing `OPENAI_MODEL=gpt-4o-mini` remains the M1 model. It is
-   the recommended default unless the team has a measured reason to change it.
+4. Run a small extraction/verification eval before freezing the model. The current
+   app-wide fallback is `OPENAI_MODEL=gpt-4o-mini`; the proposed current fast/default
+   candidate for A is `gpt-5.6-luna`. Do not move A to `gpt-5.5` without an eval that
+   justifies its higher latency and cost for this focused structured task.
 
 ### Not required to start implementation
 
@@ -372,7 +416,7 @@ acceptance.
 
   ```text
   OPENAI_API_KEY=<developer-owned key>
-  OPENAI_MODEL=gpt-4o-mini
+  OPENAI_MODEL=gpt-5.6-luna
   ```
 
   Never put the key in chat, Git, `VITE_*`, frontend code, fixtures or test output.
