@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -10,8 +11,10 @@ from app.demo_loader import load_sources
 from app.ingestion import SignalIngestionService
 from app.schemas import Claim, ClaimScope, Entity, Evidence, VerificationStatus
 from app.signal_store import (
+    DispatchInProgress,
     IdempotencyKeyConflict,
     IdempotentRequestInProgress,
+    InvalidDispatchState,
     SQLiteSignalStore,
 )
 
@@ -70,6 +73,8 @@ def test_repeated_source_identity_skips_extraction_and_dispatch(tmp_path: Path) 
     source = load_sources(1)[0]
     first = service.reserve_source(source)
     service.complete_signal(first.signal_id, [_claim(first.signal_id)])
+    assert service.begin_dispatch(first.signal_id).should_dispatch
+    service.complete_dispatch(first.signal_id)
 
     repeated = service.reserve_source(source)
 
@@ -114,6 +119,7 @@ def test_pure_repost_is_a_new_completed_signal_without_claims(tmp_path: Path) ->
     assert repost.source_relation == "repost"
     assert repost.duplicate_of_signal_id == original.signal_id
     assert repost.claims == []
+    assert service.begin_dispatch(repost.signal_id).should_dispatch
 
 
 def test_identical_text_with_a_distinct_identity_is_retained(tmp_path: Path) -> None:
@@ -330,3 +336,91 @@ def test_aborted_request_can_be_claimed_for_an_explicit_retry(tmp_path: Path) ->
     assert retry.is_new
     assert retry.response_json is None
     assert retry.response_status is None
+
+
+def test_failed_dispatch_is_released_then_retried_to_success(tmp_path: Path) -> None:
+    service = _service(tmp_path / "signals.sqlite3")
+    source = load_sources(1)[0]
+    reservation = service.reserve_source(source)
+    service.complete_signal(reservation.signal_id, [_claim(reservation.signal_id)])
+
+    first_attempt = service.begin_dispatch(reservation.signal_id)
+    service.abort_dispatch(reservation.signal_id)
+    repeated_source = service.reserve_source(source)
+    retry = service.begin_dispatch(reservation.signal_id)
+    service.complete_dispatch(reservation.signal_id)
+
+    assert first_attempt.should_dispatch
+    assert not repeated_source.is_new
+    assert repeated_source.requires_dispatch
+    assert retry.should_dispatch
+    dispatched_repeat = service.reserve_source(source)
+    assert not dispatched_repeat.requires_dispatch
+    assert not service.begin_dispatch(reservation.signal_id).should_dispatch
+
+
+def test_concurrent_dispatch_has_one_owner_and_reports_other_as_in_progress(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "signals.sqlite3"
+    service = _service(db_path)
+    reservation = service.reserve_source(load_sources(1)[0])
+    service.complete_signal(reservation.signal_id, [_claim(reservation.signal_id)])
+
+    def claim_dispatch(_: int) -> str:
+        contender = SignalIngestionService(SQLiteSignalStore(db_path))
+        try:
+            result = contender.begin_dispatch(reservation.signal_id)
+        except DispatchInProgress as exc:
+            return exc.code
+        return "owner" if result.should_dispatch else "already_dispatched"
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        outcomes = list(executor.map(claim_dispatch, range(8)))
+
+    assert outcomes.count("owner") == 1
+    assert outcomes.count("dispatch_in_progress") == 7
+
+
+def test_reserved_and_extraction_failed_signals_cannot_dispatch(tmp_path: Path) -> None:
+    service = _service(tmp_path / "signals.sqlite3")
+    reserved = service.reserve_source(load_sources(1)[0])
+
+    with pytest.raises(InvalidDispatchState):
+        service.begin_dispatch(reserved.signal_id)
+
+    service.fail_extraction(reserved.signal_id, "extraction failed after two attempts")
+    with pytest.raises(InvalidDispatchState):
+        service.begin_dispatch(reserved.signal_id)
+
+
+def test_init_schema_adds_dispatch_lifecycle_to_existing_signals_table(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE signals (
+                signal_id TEXT PRIMARY KEY,
+                ingestion_status TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO signals(signal_id, ingestion_status) VALUES (?, ?)",
+            ("sig_legacy", "completed"),
+        )
+
+    store = SQLiteSignalStore(db_path)
+    store.init_schema()
+
+    with store.connect() as connection:
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(signals)")
+        }
+        dispatch_status = connection.execute(
+            "SELECT dispatch_status FROM signals WHERE signal_id = 'sig_legacy'"
+        ).fetchone()[0]
+    assert "dispatch_status" in columns
+    assert dispatch_status == "pending"

@@ -4,20 +4,40 @@ from datetime import datetime, timedelta, timezone
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlsplit
 from uuid import UUID
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from openai import AsyncOpenAI
 
+from .claim_extraction import (
+    ClaimExtractor,
+    ClaimExtractorProtocol,
+    OpenAIClaimDraftProvider,
+)
+from .claim_verification import ClaimVerificationService, OpenAIVerificationProvider
 from .config import Settings
+from .demo_loader import EvidenceInput, load_evidence
+from .ingestion import SignalIngestionService
 from .planner import PlanGenerationError, Planner
 from .rate_limit import BoundedConcurrency, InMemoryRateLimiter
 from .schemas import ConfigResponse, GoalRequest, HealthResponse, RunResponse
 from .session import new_session, verify_session
+from .signal_api import (
+    CaseDispatcherProtocol,
+    ClaimVerifierProtocol,
+    NoopCaseDispatcher,
+    SignalAPI,
+    UnavailableClaimExtractor,
+    UnavailableVerificationProvider,
+    create_signal_router,
+)
+from .signal_store import SQLiteSignalStore, SignalStoreUnavailable
 from .store import SQLiteRunStore, DailyLimitReached, RunRecord, RunStoreProtocol, StoreUnavailable
 
 logger = logging.getLogger(__name__)
@@ -121,10 +141,65 @@ def create_app(
     settings: Settings | None = None,
     store: RunStoreProtocol | None = None,
     planner: Any | None = None,
+    *,
+    signal_store: SQLiteSignalStore | None = None,
+    claim_extractor: ClaimExtractorProtocol | None = None,
+    claim_verifier: ClaimVerifierProtocol | None = None,
+    case_dispatcher: CaseDispatcherProtocol | None = None,
+    evidence_loader: Callable[[list[str], int], list[EvidenceInput]] = load_evidence,
 ) -> FastAPI:
     app_settings = settings or Settings.from_env()
     app_store = store or SQLiteRunStore(app_settings.db_path, app_settings.db_connect_timeout_seconds)
     app_planner = planner or Planner(app_settings)
+    app_signal_store = signal_store or SQLiteSignalStore(
+        app_settings.db_path,
+        app_settings.db_connect_timeout_seconds,
+    )
+    owned_async_resources: list[Any] = []
+    if claim_extractor is None:
+        if app_settings.openai_api_key:
+            extraction_provider = OpenAIClaimDraftProvider(app_settings)
+            owned_async_resources.append(extraction_provider)
+            app_claim_extractor = ClaimExtractor(extraction_provider)
+        else:
+            app_claim_extractor = UnavailableClaimExtractor()
+    else:
+        app_claim_extractor = claim_extractor
+
+    if claim_verifier is None:
+        if app_settings.openai_api_key:
+            verification_client = AsyncOpenAI(
+                api_key=app_settings.openai_api_key,
+                timeout=app_settings.model_timeout_seconds,
+                max_retries=0,
+                http_client=httpx.AsyncClient(
+                    timeout=app_settings.model_timeout_seconds
+                ),
+            )
+            owned_async_resources.append(verification_client)
+            app_claim_verifier = ClaimVerificationService(
+                OpenAIVerificationProvider(
+                    verification_client,
+                    app_settings.openai_model,
+                )
+            )
+        else:
+            app_claim_verifier = ClaimVerificationService(
+                UnavailableVerificationProvider()
+            )
+    else:
+        app_claim_verifier = claim_verifier
+
+    app_case_dispatcher = case_dispatcher or NoopCaseDispatcher()
+    app_signal_ingestion = SignalIngestionService(app_signal_store)
+    app_signal_api = SignalAPI(
+        app_signal_store,
+        app_signal_ingestion,
+        app_claim_extractor,
+        app_claim_verifier,
+        evidence_loader,
+        app_case_dispatcher,
+    )
     limiter = InMemoryRateLimiter(app_settings.rate_limit_per_minute)
     global_limiter = InMemoryRateLimiter(app_settings.global_rate_limit_per_minute)
     concurrency = BoundedConcurrency(app_settings.max_concurrent_requests)
@@ -136,6 +211,7 @@ def create_app(
     def initialise_database(app: FastAPI) -> bool:
         try:
             app_store.init_schema()
+            app_signal_store.init_schema()
             if not app_store.ping():
                 app.state.db_ready = False
                 return False
@@ -159,11 +235,15 @@ def create_app(
         close = getattr(app_planner, "close", None)
         if close:
             await close()
+        for resource in owned_async_resources:
+            await resource.close()
 
     app = FastAPI(title="Hackathon Agent Starter", version="0.1.0", lifespan=lifespan)
     app.state.settings = app_settings
     app.state.store = app_store
     app.state.planner = app_planner
+    app.state.signal_store = app_signal_store
+    app.state.signal_api = app_signal_api
 
     @app.middleware("http")
     async def request_limits(request: Request, call_next):
@@ -213,6 +293,11 @@ def create_app(
     async def store_error_handler(request: Request, exc: StoreUnavailable):
         logger.warning("store unavailable for %s: %s", request.url.path, type(exc).__name__)
         return _error("database_unavailable", "資料暫時無法儲存，請稍後再試。", status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @app.exception_handler(SignalStoreUnavailable)
+    async def signal_store_error_handler(request: Request, exc: SignalStoreUnavailable):
+        logger.warning("signal store unavailable for %s: %s", request.url.path, type(exc).__name__)
+        return _error("database_unavailable", "訊號資料暫時無法儲存，請稍後再試。", status.HTTP_503_SERVICE_UNAVAILABLE)
 
     @app.get("/api/config", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:
@@ -291,6 +376,8 @@ def create_app(
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="找不到這筆規劃")
         return _as_response(record)
+
+    app.include_router(create_signal_router(app_signal_api))
 
     if DIST_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")

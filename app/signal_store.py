@@ -42,6 +42,16 @@ class InvalidIdempotencyState(SignalStoreError):
     """An idempotent request completion does not match a pending claim."""
 
 
+class DispatchInProgress(SignalStoreError):
+    """Another caller currently owns this Signal's dispatch attempt."""
+
+    code = "dispatch_in_progress"
+
+
+class InvalidDispatchState(SignalStoreError):
+    """The Signal cannot make the requested dispatch transition."""
+
+
 @dataclass(frozen=True)
 class SourceReservation:
     source: Source
@@ -69,6 +79,12 @@ class IdempotentRequestReservation:
     @property
     def is_replay(self) -> bool:
         return not self.is_new
+
+
+@dataclass(frozen=True)
+class DispatchReservation:
+    signal_id: str
+    should_dispatch: bool
 
 
 class VerificationResultLike(Protocol):
@@ -161,6 +177,11 @@ class SQLiteSignalStore:
                     ingestion_status TEXT NOT NULL CHECK (
                         ingestion_status IN ('reserved', 'completed', 'extraction_failed')
                     ),
+                    dispatch_status TEXT NOT NULL DEFAULT 'not_ready' CHECK (
+                        dispatch_status IN (
+                            'not_ready', 'pending', 'in_progress', 'dispatched'
+                        )
+                    ),
                     sanitized_error TEXT,
                     created_at TEXT NOT NULL,
                     completed_at TEXT
@@ -246,6 +267,29 @@ class SQLiteSignalStore:
                     ON evidence(claim_id, verification_attempt_id, ordinal);
                 """
             )
+            # Add the dispatch lifecycle without requiring a destructive migration
+            # for databases created before this column existed.
+            signal_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(signals)")
+            }
+            if "dispatch_status" not in signal_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE signals ADD COLUMN dispatch_status TEXT NOT NULL
+                    DEFAULT 'not_ready' CHECK (
+                        dispatch_status IN (
+                            'not_ready', 'pending', 'in_progress', 'dispatched'
+                        )
+                    )
+                    """
+                )
+                connection.execute(
+                    """
+                    UPDATE signals SET dispatch_status = 'pending'
+                    WHERE ingestion_status = 'completed'
+                    """
+                )
 
     def begin_idempotent_request(
         self, operation: str, key: str, request_hash: str
@@ -400,6 +444,82 @@ class SQLiteSignalStore:
                 (operation, key, request_hash),
             )
 
+    def begin_dispatch(self, signal_id: str) -> DispatchReservation:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT ingestion_status, dispatch_status
+                FROM signals WHERE signal_id = ?
+                """,
+                (signal_id,),
+            ).fetchone()
+            if row is None:
+                raise InvalidDispatchState("Signal does not exist")
+            if row["ingestion_status"] != "completed":
+                raise InvalidDispatchState(
+                    "Signal must complete extraction before dispatch"
+                )
+            if row["dispatch_status"] == "dispatched":
+                return DispatchReservation(signal_id=signal_id, should_dispatch=False)
+            if row["dispatch_status"] == "in_progress":
+                raise DispatchInProgress("Signal dispatch is already in progress")
+            if row["dispatch_status"] != "pending":
+                raise InvalidDispatchState("Signal is not ready for dispatch")
+            changed = connection.execute(
+                """
+                UPDATE signals SET dispatch_status = 'in_progress'
+                WHERE signal_id = ? AND ingestion_status = 'completed'
+                    AND dispatch_status = 'pending'
+                """,
+                (signal_id,),
+            ).rowcount
+            if changed != 1:
+                raise DispatchInProgress("Signal dispatch was claimed concurrently")
+            return DispatchReservation(signal_id=signal_id, should_dispatch=True)
+
+    def complete_dispatch(self, signal_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT dispatch_status FROM signals WHERE signal_id = ?",
+                (signal_id,),
+            ).fetchone()
+            if row is None:
+                raise InvalidDispatchState("Signal does not exist")
+            if row["dispatch_status"] == "dispatched":
+                return
+            if row["dispatch_status"] != "in_progress":
+                raise InvalidDispatchState("Signal dispatch is not in progress")
+            connection.execute(
+                """
+                UPDATE signals SET dispatch_status = 'dispatched'
+                WHERE signal_id = ? AND dispatch_status = 'in_progress'
+                """,
+                (signal_id,),
+            )
+
+    def abort_dispatch(self, signal_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT dispatch_status FROM signals WHERE signal_id = ?",
+                (signal_id,),
+            ).fetchone()
+            if row is None:
+                raise InvalidDispatchState("Signal does not exist")
+            if row["dispatch_status"] in {"pending", "dispatched"}:
+                return
+            if row["dispatch_status"] != "in_progress":
+                raise InvalidDispatchState("Signal is not dispatchable")
+            connection.execute(
+                """
+                UPDATE signals SET dispatch_status = 'pending'
+                WHERE signal_id = ? AND dispatch_status = 'in_progress'
+                """,
+                (signal_id,),
+            )
+
     def reserve_source(self, request: SourceReservation) -> IngestionReservation:
         signal_id = f"sig_{uuid4().hex}"
         now = _now()
@@ -409,7 +529,7 @@ class SQLiteSignalStore:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
                 """
-                SELECT s.signal_id
+                SELECT s.signal_id, s.ingestion_status, s.dispatch_status
                 FROM source_idempotency AS i
                 JOIN signals AS s ON s.signal_id = i.signal_id
                 WHERE i.provider = ? AND i.source_id = ?
@@ -417,11 +537,15 @@ class SQLiteSignalStore:
                 (request.source.provider, request.source.source_id),
             ).fetchone()
             if existing is not None:
+                requires_dispatch = (
+                    existing["ingestion_status"] == "completed"
+                    and existing["dispatch_status"] != "dispatched"
+                )
                 return IngestionReservation(
                     signal_id=existing["signal_id"],
                     is_new=False,
                     requires_extraction=False,
-                    requires_dispatch=False,
+                    requires_dispatch=requires_dispatch,
                 )
 
             duplicate_of_signal_id: str | None = None
@@ -456,8 +580,9 @@ class SQLiteSignalStore:
                 """
                 INSERT INTO signals(
                     signal_id, provider, source_id, source_json, source_relation,
-                    duplicate_of_signal_id, ingestion_status, created_at, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    duplicate_of_signal_id, ingestion_status, dispatch_status,
+                    created_at, completed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     signal_id,
@@ -467,6 +592,7 @@ class SQLiteSignalStore:
                     request.source_relation,
                     duplicate_of_signal_id,
                     status,
+                    "pending" if pure_repost else "not_ready",
                     now,
                     completed_at,
                 ),
@@ -530,7 +656,7 @@ class SQLiteSignalStore:
                 """
                 UPDATE signals
                 SET ingestion_status = 'completed', sanitized_error = NULL,
-                    completed_at = ?
+                    dispatch_status = 'pending', completed_at = ?
                 WHERE signal_id = ?
                 """,
                 (now, signal_id),

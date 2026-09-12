@@ -4,6 +4,7 @@ from typing import Any, Protocol
 
 from .schemas import Claim, Signal, Source
 from .signal_store import (
+    DispatchReservation,
     IdempotentRequestReservation,
     IngestionReservation,
     SourceReservation,
@@ -72,6 +73,15 @@ class SignalIngestionService:
         self, operation: str, key: str, request_hash: str
     ) -> None:
         self.store.abort_idempotent_request(operation, key, request_hash)
+
+    def begin_dispatch(self, signal_id: str) -> DispatchReservation:
+        return self.store.begin_dispatch(signal_id)
+
+    def complete_dispatch(self, signal_id: str) -> None:
+        self.store.complete_dispatch(signal_id)
+
+    def abort_dispatch(self, signal_id: str) -> None:
+        self.store.abort_dispatch(signal_id)
 
 
 IngestionService = SignalIngestionService
