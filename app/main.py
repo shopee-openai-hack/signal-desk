@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,7 +30,6 @@ from .session import new_session, verify_session
 from .signal_api import (
     CaseDispatcherProtocol,
     ClaimVerifierProtocol,
-    NoopCaseDispatcher,
     SignalAPI,
     UnavailableClaimExtractor,
     UnavailableVerificationProvider,
@@ -38,6 +37,15 @@ from .signal_api import (
 )
 from .signal_store import SQLiteSignalStore, SignalStoreUnavailable
 from .store import SQLiteRunStore, DailyLimitReached, RunRecord, RunStoreProtocol, StoreUnavailable
+from .case_agent import (
+    CaseModelUnavailable, CaseService, InProcessCaseDispatcher,
+    InvalidCaseDecision, OpenAICaseDecider,
+)
+from .case_schemas import (
+    AgentStatus, AdvanceRequest, CaseSnapshot, DispatchRequest, Page,
+    SignalPage, SignalRead, TimelinePage,
+)
+from .case_store import CaseStore, SignalConflict, VersionConflict
 
 logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -132,7 +140,7 @@ def _as_response(record: RunRecord) -> RunResponse:
 def _error(code: str, message: str, status_code: int) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
-        content={"error": {"code": code, "message": message}},
+        content={"error": {"code": code, "message": message, "details": {}}},
     )
 
 
@@ -146,6 +154,9 @@ def create_app(
     claim_verifier: ClaimVerifierProtocol | None = None,
     case_dispatcher: CaseDispatcherProtocol | None = None,
     evidence_loader: Callable[[list[str], int], list[EvidenceInput]] = load_evidence,
+    case_store: CaseStore | None = None,
+    case_decider: Any | None = None,
+    product_catalog: Callable[[], list[dict]] | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings.from_env()
     app_store = store or SQLiteRunStore(app_settings.db_path, app_settings.db_connect_timeout_seconds)
@@ -153,6 +164,15 @@ def create_app(
     app_signal_store = signal_store or SQLiteSignalStore(
         app_settings.db_path,
         app_settings.db_connect_timeout_seconds,
+    )
+    app_case_store = case_store or CaseStore(
+        app_settings.db_path, app_settings.db_connect_timeout_seconds,
+        signal_reader=app_signal_store,
+    )
+    app_case_decider = case_decider or OpenAICaseDecider(app_settings)
+    case_service = CaseService(
+        app_case_store, app_case_decider, product_catalog,
+        app_settings.daily_request_limit,
     )
     owned_async_resources: list[Any] = []
     if claim_extractor is None:
@@ -189,7 +209,7 @@ def create_app(
     else:
         app_claim_verifier = claim_verifier
 
-    app_case_dispatcher = case_dispatcher or NoopCaseDispatcher()
+    app_case_dispatcher = case_dispatcher or InProcessCaseDispatcher(case_service)
     app_signal_api = SignalAPI(
         app_signal_store,
         app_claim_extractor,
@@ -200,6 +220,9 @@ def create_app(
     limiter = InMemoryRateLimiter(app_settings.rate_limit_per_minute)
     global_limiter = InMemoryRateLimiter(app_settings.global_rate_limit_per_minute)
     concurrency = BoundedConcurrency(app_settings.max_concurrent_requests)
+    case_concurrency = BoundedConcurrency(app_settings.max_concurrent_requests)
+    case_limiter = InMemoryRateLimiter(app_settings.rate_limit_per_minute)
+    case_global_limiter = InMemoryRateLimiter(app_settings.global_rate_limit_per_minute)
 
     def cleanup_stale_runs() -> None:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=app_settings.running_ttl_seconds)
@@ -209,6 +232,7 @@ def create_app(
         try:
             app_store.init_schema()
             app_signal_store.init_schema()
+            app_case_store.init_schema()
             if not app_store.ping():
                 app.state.db_ready = False
                 return False
@@ -234,6 +258,9 @@ def create_app(
             await close()
         for resource in owned_async_resources:
             await resource.close()
+        case_close = getattr(app_case_decider, "close", None)
+        if case_close:
+            await case_close()
 
     app = FastAPI(title="Hackathon Agent Starter", version="0.1.0", lifespan=lifespan)
     app.state.settings = app_settings
@@ -241,6 +268,8 @@ def create_app(
     app.state.planner = app_planner
     app.state.signal_store = app_signal_store
     app.state.signal_api = app_signal_api
+    app.state.case_store = app_case_store
+    app.state.case_service = case_service
 
     @app.middleware("http")
     async def request_limits(request: Request, call_next):
@@ -295,6 +324,91 @@ def create_app(
     async def signal_store_error_handler(request: Request, exc: SignalStoreUnavailable):
         logger.warning("signal store unavailable for %s: %s", request.url.path, type(exc).__name__)
         return _error("database_unavailable", "訊號資料暫時無法儲存，請稍後再試。", status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @app.exception_handler(VersionConflict)
+    async def case_version_error(request: Request, exc: VersionConflict):
+        del request
+        return _error("version_conflict", str(exc), 409)
+
+    @app.exception_handler(InvalidCaseDecision)
+    async def case_decision_error(request: Request, exc: InvalidCaseDecision):
+        del request
+        return _error("invalid_case_decision", str(exc), 422)
+
+    @app.exception_handler(CaseModelUnavailable)
+    async def case_model_error(request: Request, exc: CaseModelUnavailable):
+        del request
+        return _error("case_model_unavailable", str(exc), 503)
+
+    @app.exception_handler(SignalConflict)
+    async def case_signal_error(request: Request, exc: SignalConflict):
+        del request
+        return _error("signal_conflict", str(exc), 409)
+
+    @app.exception_handler(DailyLimitReached)
+    async def case_daily_limit_error(request: Request, exc: DailyLimitReached):
+        del request, exc
+        return _error("daily_limit_reached", "Case model budget reached for today", 429)
+
+    @app.post("/api/v1/cases/dispatch", response_model=CaseSnapshot)
+    async def dispatch_case(payload: DispatchRequest, request: Request,
+                            idempotency_key: str = Header(min_length=1, max_length=200)):
+        if not case_limiter.allow(request.state.visitor_id) or not case_global_limiter.allow("__global__"):
+            return _error("rate_limited", "Case request limit reached", 429)
+        if not await case_concurrency.try_acquire():
+            return _error("concurrency_limited", "Too many case decisions are running", 429)
+        try:
+            result = await case_service.dispatch(payload.signal_id, idempotency_key, payload.replay_at)
+            if result is None:
+                return _error("signal_not_found", "Signal not found", 404)
+            return result
+        finally:
+            case_concurrency.release()
+
+    @app.get("/api/v1/cases", response_model=Page)
+    async def list_cases() -> Page:
+        return Page(items=app_case_store.list_case_summaries())
+
+    @app.get("/api/v1/signals", response_model=SignalPage)
+    async def list_signals() -> SignalPage:
+        return SignalPage(items=[SignalRead.model_validate({
+            **signal.model_dump(),
+            "case_id": app_case_store.case_id_for_signal(signal.signal_id),
+        }) for signal in app_signal_store.list_signals()])
+
+    @app.get("/api/v1/cases/{case_id}", response_model=CaseSnapshot)
+    async def get_case(case_id: str):
+        result = app_case_store.get_case(case_id)
+        return result if result else _error("case_not_found", "Case not found", 404)
+
+    @app.get("/api/v1/cases/{case_id}/timeline", response_model=TimelinePage)
+    async def get_case_timeline(case_id: str):
+        if app_case_store.get_case(case_id) is None:
+            return _error("case_not_found", "Case not found", 404)
+        return TimelinePage(items=app_case_store.timeline(case_id))
+
+    @app.get("/api/v1/cases/{case_id}/agent-status", response_model=AgentStatus)
+    async def get_case_agent_status(case_id: str):
+        result = app_case_store.get_agent_status(case_id)
+        return result if result else _error(
+            "agent_status_not_found", "Agent observation not found", 404
+        )
+
+    @app.post("/api/v1/cases/{case_id}/advance", response_model=CaseSnapshot)
+    async def advance_case(case_id: str, payload: AdvanceRequest, request: Request,
+                           idempotency_key: str = Header(min_length=1, max_length=200)):
+        if not case_limiter.allow(request.state.visitor_id) or not case_global_limiter.allow("__global__"):
+            return _error("rate_limited", "Case request limit reached", 429)
+        if not await case_concurrency.try_acquire():
+            return _error("concurrency_limited", "Too many case decisions are running", 429)
+        try:
+            result = await case_service.advance(
+                case_id, payload.expected_version, payload.verification_updates,
+                idempotency_key, payload.replay_at,
+            )
+            return result if result else _error("case_not_found", "Case not found", 404)
+        finally:
+            case_concurrency.release()
 
     @app.get("/api/config", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:

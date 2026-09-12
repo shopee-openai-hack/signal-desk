@@ -1,0 +1,71 @@
+{
+  "items": [
+    {
+      "timeline_id": "tl_s1_signal",
+      "case_id": "case_001",
+      "case_version": 1,
+      "kind": "signal_added",
+      "occurred_at": "2026-06-30T05:20:00Z",
+      "summary": "收到泰山沙拉油疑似收回的二手貼文",
+      "reason": "保留原文；氣味經驗不是安全問題的證據",
+      "source_refs": [
+        "sig_s1_post_001"
+      ],
+      "actor": {
+        "type": "case_agent",
+        "id": "agent_food_safety"
+      }
+    },
+    {
+      "timeline_id": "tl_s1_assessment",
+      "case_id": "case_001",
+      "case_version": 1,
+      "kind": "assessment_updated",
+      "occurred_at": "2026-06-30T05:20:00Z",
+      "summary": "建立待釐清的中優先級案件",
+      "reason": "單一二手來源指出可能的健康風險，但尚無可核實證據",
+      "source_refs": [
+        "sig_s1_post_001",
+        "clm_s1_hypothesis_recall"
+      ],
+      "actor": {
+        "type": "case_agent",
+        "id": "agent_food_safety"
+      }
+    },
+    {
+      "timeline_id": "tl_s1_monitoring",
+      "case_id": "case_001",
+      "case_version": 1,
+      "kind": "monitoring_updated",
+      "occurred_at": "2026-06-30T05:20:00Z",
+      "summary": "安排後續追蹤",
+      "reason": "等待獨立來源或官方公告",
+      "source_refs": [
+        "sig_s1_post_001"
+      ],
+      "actor": {
+        "type": "case_agent",
+        "id": "agent_food_safety"
+      }
+    },
+    {
+      "timeline_id": "tl_s2_repost",
+      "case_id": "case_001",
+      "case_version": 1,
+      "kind": "signal_added",
+      "occurred_at": "2026-06-30T10:05:00Z",
+      "summary": "收到原文純轉傳",
+      "reason": "只增加來源活動，不增加獨立佐證或重做案件判讀",
+      "source_refs": [
+        "sig_s2_post_002",
+        "sig_s1_post_001"
+      ],
+      "actor": {
+        "type": "case_agent",
+        "id": "agent_food_safety"
+      }
+    }
+  ],
+  "next_cursor": null
+}

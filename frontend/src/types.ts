@@ -39,7 +39,7 @@ export interface CaseSummary {
   agent_state: AgentState | null;
 }
 
-export interface CaseSnapshot extends CaseSummary {
+export interface CaseSnapshot extends Omit<CaseSummary, "latest_change" | "next_check_at" | "agent_state"> {
   claim_ids: string[];
   unknowns: string[];
   next_steps: string[];
@@ -99,7 +99,7 @@ export interface Signal {
   source: Source;
   source_relation: "original" | "repost" | "independent_report" | "unknown";
   duplicate_of_signal_id: string | null;
-  case_id: string;
+  case_id: string | null;
   claims: Claim[];
 }
 
