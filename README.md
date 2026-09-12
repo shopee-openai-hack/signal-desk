@@ -9,6 +9,7 @@
 | 閱讀目的 | 文件 |
 | --- | --- |
 | 提交概覽、展示路徑與待驗收項目 | [Submission](docs/SUBMISSION.md) |
+| 展示簡報 | [Presentation slides](present-slide.pdf) |
 | 全專案文件索引與權威順序 | [文件索引](docs/README.md) |
 | 產品範圍與成功條件 | [INTENT](INTENT.md) |
 | 資料契約與即時／回放 API 邊界 | [Contracts](contracts/README.md) |
