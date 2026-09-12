@@ -1,14 +1,16 @@
 # A/M1 implementation tasks
 
-Status: Ready for assignment after the gates below  
-Source spec: `SPEC.md`  
+Status: Ready for assignment
+Source spec: `SPEC.md`
 Workstream: A — synthesized signal ingestion and verification
 
 ## How to use this file
 
 Assign one task below to one subagent. Each task is bounded, names the files it owns,
-and has an independent verification command. Tasks may run in parallel only when
-their declared dependencies are satisfied and their owned files do not overlap.
+and has an independent verification command. A declared dependency is only a code
+merge-order requirement; it is never a request for more product clarification or
+teammate approval. Once the dependency commits are present, the assignee must execute
+the task directly using the frozen decisions below.
 
 Every subagent must first read, in order:
 
@@ -23,38 +25,41 @@ Every subagent must first read, in order:
 Shared constraints for every task:
 
 - Preserve the existing FastAPI/Pydantic/httpx/OpenAI SDK/SQLite stack.
-- Do not create a private alternative to the canonical Signal, Claim or Evidence
-  models owned by B.
-- Do not modify a central enum or contract meaning without B's coordinated update.
+- Import the canonical Signal, Claim and Evidence models from `app/schemas.py`; do not
+  create a task-local alternative.
+- Do not modify a central enum or contract meaning in an implementation task.
 - Do not fetch production secrets. Tests must use deterministic fakes and temporary
   SQLite files.
 - Do not hold a SQLite write transaction while awaiting an LLM or HTTP call.
 - Do not commit, push or deploy unless the user separately authorizes it.
 - Preserve unrelated worktree changes.
 
-## External gates
+## Frozen implementation decisions
 
-These are coordination requirements, not A implementation tasks.
+No task below requires a new answer from A, B, D or the user before it starts:
 
-### Gate B0 — shared contract acceptance
+1. `contracts/README.md` is the field and enum authority. Task A0 translates its
+   existing Signal, Claim and Evidence shapes into the one shared Pydantic
+   implementation; it does not redesign them.
+2. `issues/01a-synthesized-data-handoff.md` is the M1 scenario authority. Task A1
+   owns writing the complete committed synthesized pack that satisfies its stages and
+   checklist. The content must remain clearly synthetic; no later approval is a task
+   completion condition.
+3. A hands a new Signal to B through an injected async
+   `CaseDispatcherProtocol.dispatch(signal_id: str) -> None`. Implementation and tests
+   use this interface directly; defining Case grouping or `Case.signal_ids` is outside
+   A and does not block any A task.
+4. The two A write endpoints use the exact request/response semantics stated in Task
+   A5. No assignee should invent or wait for a second transport contract.
+5. Model-backed code reads `OPENAI_MODEL`; tests use deterministic fakes. Model
+   benchmarking can change configuration later but is not a coding prerequisite.
 
-B remains the central contract steward, but A may author the initial Pydantic
-`Signal`, `Claim` and `Evidence` models in Task A0 and send them to B for review. B
-must accept those shared models and confirm the request semantics for case dispatch
-and claim verification. B must also decide how a Case exposes all related Signals,
-including pure reposts with no new Claim; `signal_ids` is the current recommendation.
+Assignment order:
 
-Until B accepts the proposal, A tasks may build against Task A0 on this branch, but
-final A/B integration must not be claimed and no competing canonical model may be
-introduced.
-
-### Gate D0 — scenario pack
-
-D must provide the exact staged synthesized posts, Evidence documents and expected
-business interpretation described in `issues/01a-synthesized-data-handoff.md`.
-The D owner has approved the handoff design. Placeholders may be used for unit tests,
-but M1 acceptance cannot be claimed until the actual shared D pack is installed and
-reviewed.
+- Wave 1, parallel: A0 and A1.
+- Wave 2, parallel after its listed prerequisites: A2, A3, A4 and A6.
+- Wave 3: A5.
+- Wave 4: A7.
 
 ## Task A0 — canonical Signal contract models
 
@@ -82,8 +87,8 @@ Do not add or modify Case, Product, Approval or Execution semantics in this task
 - Enforce the existing rule that `supported` and `refuted` Claims cite at least one
   Evidence item; do not add a `mixed` enum.
 - Add focused model validation and JSON round-trip tests.
-- Present the resulting diff to B for contract review; do not create an A-only copy
-  of these models in another module.
+- Keep these as the only Signal-side canonical models; do not create an A-only copy
+  in another module.
 
 ### Done when
 
@@ -92,7 +97,7 @@ Do not add or modify Case, Product, Approval or Execution semantics in this task
   IDs are rejected.
 - Existing planner schema tests remain valid.
 - `uv run pytest tests/test_signal_contract_models.py` passes.
-- B has been given the exact diff and confirms it as the shared model baseline.
+- `uv run pytest` still passes, proving the additions preserve starter behavior.
 
 ## Task A1 — synthesized dataset loader
 
@@ -123,8 +128,12 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
   later-stage Evidence.
 - Validate dataset version, unique provider/source identity, UTC timestamps and valid
   repost references.
-- Add a minimal placeholder dataset sufficient for unit tests. Clearly mark that D0
-  must replace or approve its scenario content.
+- Add the complete five-stage M1 synthesized pack described by the handoff document:
+  initial experience, pure repost, independent report or scoped hypothesis, later
+  supporting Evidence, and a later refuting or insufficient-Evidence path.
+- Choose stable synthetic copy, IDs and expected relationships while implementing the
+  pack. Do not pause for copy review; the committed pack becomes the deterministic M1
+  baseline and can be revised through an ordinary later diff.
 
 ### Done when
 
@@ -132,6 +141,8 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
 - Stage N never returns earlier stages again.
 - Missing Evidence IDs, future-stage Evidence, duplicate source IDs and invalid
   repost references fail with typed, sanitized errors.
+- The committed pack covers all five stages and contains no claim that its publishers
+  or URLs are real.
 - `uv run pytest tests/test_demo_loader.py` passes.
 
 ## Task A2 — Signal persistence and idempotent ingestion
@@ -141,9 +152,9 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
 Persist canonical Signals and Claims in SQLite and implement source-level
 idempotency and explicit repost semantics.
 
-### Dependencies
+### Code prerequisite
 
-- Task A0 for canonical model imports; Gate B0 is required before final integration.
+- Task A0.
 
 ### Owned files
 
@@ -161,13 +172,32 @@ Do not edit `app/store.py`, `app/schemas.py` or `app/main.py` in this task.
 - Create additive `CREATE TABLE IF NOT EXISTS` schema for Signals, Claims, Evidence,
   verification attempts and idempotency records as required by the spec.
 - Treat `(provider, source_id)` as the acquisition identity.
-- Return an existing Signal on repeated ingestion without re-extraction or a new
-  dispatch request.
+- Expose a reservation/result boundary that tells the caller whether a provider source
+  is new before the caller invokes extraction. Completing a reservation accepts
+  already-extracted Claims; this task does not call an LLM or B.
+- Use this public service boundary (equivalent sync names are acceptable because all
+  methods are local SQLite operations):
+
+  ```python
+  reserve_source(source_input) -> IngestionReservation  # contains signal_id and is_new
+  complete_signal(signal_id, claims: list[Claim]) -> Signal
+  fail_extraction(signal_id, sanitized_error) -> None
+  get_signal(signal_id) -> Signal | None
+  get_claim(claim_id) -> Claim | None
+  append_verification(claim_id, result) -> Claim
+  ```
+
+  Runtime `signal_id` is allocated during reservation. Extraction receives that ID
+  and returns Claims already linked to it; persistence must not rewrite IDs.
+- Return an existing Signal on repeated ingestion and mark it as not requiring
+  extraction or dispatch.
 - Persist pure reposts as new Signals linked to the original Signal and with no new
   Claims.
 - Retain similar independent reports even when their text is identical.
 - Expose repository methods that B can use to load a canonical Signal with Claims by
   `signal_id`.
+- Expose methods to load a Claim, append a verification attempt, and reconstruct its
+  current canonical Evidence without overwriting earlier attempts.
 - Keep transactions short and injectable for isolated tests.
 
 ### Done when
@@ -185,9 +215,9 @@ Do not edit `app/store.py`, `app/schemas.py` or `app/main.py` in this task.
 Implement one bounded structured-output LLM call that extracts source-grounded Claim
 units without over-splitting or inventing scope.
 
-### Dependencies
+### Code prerequisite
 
-- Task A0 for canonical Claim construction; Gate B0 is required before final integration.
+- Task A0.
 
 ### Owned files
 
@@ -201,6 +231,10 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 ### Work
 
 - Define an injected extractor protocol so tests never call a paid provider.
+- Expose `extract(signal_id: str, source: Source) -> list[Claim]`. The structured model
+  response omits runtime IDs, Evidence and verification state; application code maps
+  each validated draft to a canonical Claim, generates its opaque `claim_id`, copies
+  the supplied `signal_id`, and applies the initial status from SPEC section 7.4.
 - Implement the OpenAI-backed extractor with structured output using the configured
   backend `OPENAI_API_KEY` and `OPENAI_MODEL`.
 - Give the model only the current source and attribution metadata; do not enable web
@@ -226,12 +260,12 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 ### Goal
 
 Implement a callable verifier that compares one canonical Claim with explicitly
-supplied synthesized Evidence and persists no unsupported verdict.
+supplied synthesized Evidence and returns no unsupported verdict. Persistence is
+performed by the composition layer through Task A2's repository.
 
-### Dependencies
+### Code prerequisites
 
-- Task A0 for canonical Claim and Evidence imports; Gate B0 is required before final integration.
-- Task A1's Evidence loader interface.
+- Tasks A0 and A1.
 
 ### Owned files
 
@@ -245,6 +279,18 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 ### Work
 
 - Define an injected verifier protocol and a deterministic fake for tests.
+- Expose this service boundary:
+
+  ```python
+  verify(
+      claim: Claim,
+      evidence: list[EvidenceInput],
+  ) -> ClaimVerificationResult
+  ```
+
+  The result contains the new verification status, canonical Evidence items linked
+  to the input `claim_id`, attempt count and sanitized failure; it performs no SQLite
+  write.
 - Implement one structured-output OpenAI call receiving the Claim and only the
   supplied Evidence documents.
 - Return the central verification enum and one stance for every input Evidence ID.
@@ -254,7 +300,8 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
   `insufficient_evidence`.
 - Keep Experience/Request Claims as `not_applicable` when they contain no separately
   checkable proposition.
-- Allow two total attempts and preserve failed-attempt information.
+- Allow two total attempts and return sanitized failed-attempt information for the
+  caller to persist.
 
 ### Done when
 
@@ -270,10 +317,9 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 Expose the central A API, compose loader/ingestion/extraction/verification services,
 and hand each newly analyzed Signal to B exactly once.
 
-### Dependencies
+### Code prerequisites
 
-- Task A0 and Gate B0.
-- Tasks A1–A4.
+- Tasks A0–A4.
 
 ### Owned files
 
@@ -291,9 +337,18 @@ This is the only A task allowed to edit `app/main.py`.
   `Idempotency-Key` conventions.
 - Implement `POST /api/v1/claims/{claim_id}/verify` with explicit synthesized
   `evidence_ids` and current replay stage.
+- Define the ingest request body exactly as the source dataset item without `stage`:
+  `{ "source": {...}, "source_relation": "...", "duplicate_of_source_id": null }`.
+  Require `Idempotency-Key` and return the canonical `Signal` with HTTP 200 for both
+  first success and an idempotent repeat.
+- Define the verify request body exactly as
+  `{ "evidence_ids": ["ev_001"], "current_stage": 4 }`. Require
+  `Idempotency-Key` and return the updated canonical `Claim` with HTTP 200.
 - Compose ingest so an extraction call occurs outside all SQLite write transactions.
-- Call B's dispatcher with `signal_id` only after successful persistence and
-  extraction of a new Signal.
+- Define the injected async `CaseDispatcherProtocol` in `app/signal_api.py` and call
+  `dispatch(signal_id)` only after successful persistence and extraction of a new
+  Signal. Tests provide a recording fake; this task does not implement Case logic or
+  make an HTTP call to a separately guessed B payload.
 - Dispatch pure repost Signals even though they contain no new Claim.
 - Do not dispatch repeated ingestion or a source with failed extraction as a normally
   analyzed Signal.
@@ -314,10 +369,10 @@ This is the only A task allowed to edit `app/main.py`.
 Publish canonical, deterministic fixture outputs that B can consume before the live A
 pipeline is integrated.
 
-### Dependencies
+### Code prerequisites
 
-- Task A0 and Gate B0.
-- Gate D0 for final acceptance content.
+- Tasks A0 and A1. Fixture content must use the committed M1 pack rather than inventing
+  a second scenario.
 
 ### Owned files
 
@@ -337,14 +392,14 @@ Do not change `contracts/README.md` or shared enums in this task.
 
 - Create the six canonical fixtures required by SPEC section 10.3.
 - Use stable fixture IDs and explicit UTC timestamps.
-- Validate every fixture with B's shared Pydantic models.
+- Validate every fixture with the shared Pydantic models in `app/schemas.py`.
 - Ensure the pure repost is still a Signal, links to the original Signal and does not
   introduce duplicate Claims.
 - Ensure verification Evidence has source, time, excerpt and stance.
 
 ### Done when
 
-- B's models parse every fixture without aliases or translation code.
+- The shared models parse every fixture without aliases or translation code.
 - Fixtures do not claim synthesized sources are real-world announcements.
 - `uv run pytest tests/test_a_contract_fixtures.py` passes.
 
@@ -352,12 +407,11 @@ Do not change `contracts/README.md` or shared enums in this task.
 
 ### Goal
 
-Exercise the complete A pipeline against the D-approved staged dataset and verify the
-A/B handoff without changing business decisions owned by B.
+Exercise the complete A pipeline against the committed staged dataset and verify the
+A/B handoff protocol without changing business decisions owned by B.
 
-### Dependencies
+### Code prerequisites
 
-- Gates B0 and D0.
 - Tasks A0–A6.
 
 ### Owned files
@@ -372,6 +426,8 @@ than fixed through broad cross-module rewrites.
 ### Work
 
 - Replay stages in deterministic order.
+- Use an in-memory recording implementation of `CaseDispatcherProtocol`; no B service
+  or teammate setup is required.
 - Assert each new Signal is persisted and dispatched once.
 - Assert a repeated source is not redispatched.
 - Assert pure reposts remain visible without adding independent Evidence.
@@ -392,21 +448,7 @@ git diff --check
 All commands pass, or environment-only failures are reported separately from product
 acceptance.
 
-## User and teammate confirmations
-
-### Required before final M1 acceptance
-
-1. D has approved the handoff design; obtain the actual staged source/evidence pack
-   and its expected interpretations.
-2. Send Task A0's shared Pydantic model diff to B for acceptance, and ask B to decide
-   how Cases expose Signals that contain no new Claim.
-3. Ask B to confirm the exact dispatch and verify request/response bodies.
-4. Run a small extraction/verification eval before freezing the model. The current
-   app-wide fallback is `OPENAI_MODEL=gpt-4o-mini`; the proposed current fast/default
-   candidate for A is `gpt-5.6-luna`. Do not move A to `gpt-5.5` without an eval that
-   justifies its higher latency and cost for this focused structured task.
-
-### Not required to start implementation
+## Runtime notes (not task blockers)
 
 - A local OpenAI key is not required for unit tests or most implementation tasks.
 - A production OpenAI key is already recorded as configured in `INFRA_STATUS.md`; do
@@ -423,3 +465,5 @@ acceptance.
 - Threads credentials are not required for M1.
 - An explicit `mixed` verification enum is not required; M1 follows the current
   contract and uses `insufficient_evidence` for unresolved conflicting Evidence.
+- `Case.signal_ids` and B's eventual HTTP transport are B-side implementation details;
+  A's stable handoff is the injected `dispatch(signal_id)` protocol above.

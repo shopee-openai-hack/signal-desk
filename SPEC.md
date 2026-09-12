@@ -1,7 +1,7 @@
 # SPEC — A/M1 synthesized signal ingestion and verification
 
-Status: Draft for A/B/D review  
-Owner: A — signal ingestion and external verification  
+Status: Approved for A/M1 implementation
+Owner: A — signal ingestion and external verification
 Last updated: 2026-09-12
 
 ## 1. Purpose
@@ -12,8 +12,8 @@ that compares a Claim with synthesized Evidence when B requests verification.
 
 This specification refines the A workstream in `INTENT.md`. `INTENT.md` remains the
 product-scope authority, and `contracts/README.md` remains the shared API and data
-contract. If this specification and the central contract disagree, the contract
-must be coordinated by B before implementation changes either producer or consumer.
+contract. Implementation tasks follow the frozen decisions in `tasks.md` and do not
+pause for additional cross-workstream confirmation.
 
 ## 2. M1 outcome
 
@@ -63,11 +63,13 @@ resource.
 
 ### 3.3 D owns
 
-- The synthesized scenario content and stage ordering.
-- The intended source relationships: original, repost or independent report.
-- The synthesized evidence documents and their source times.
-- A written expectation of what each input can and cannot establish.
+- The accepted scenario stages and business meaning documented in the A/D handoff.
+- Reviewable later revisions to intended source relationships and Evidence meaning.
 - Business expectations for escalation, no-change and downgrade paths.
+
+A1 materializes the approved requirements as the committed deterministic M1 source
+and Evidence files, including concrete synthetic copy, IDs and timestamps. That
+materialization does not require another pre-implementation approval.
 
 Detailed A/D handoff expectations are recorded in
 `issues/01a-synthesized-data-handoff.md`.
@@ -163,8 +165,8 @@ Requirements:
 - All timestamps are explicit UTC ISO 8601 values so replay is deterministic.
 - `source_id` is unique within a provider.
 - A repost identifies the original item using `duplicate_of_source_id`.
-- D supplies `source_relation` in M1; A does not infer independent-report status with
-  an LLM.
+- The dataset supplies `source_relation` in M1; A does not infer independent-report
+  status with an LLM.
 - The dataset does not include runtime `signal_id`, `claim_id` or model verdicts.
 
 ### 5.3 Evidence dataset shape
@@ -188,8 +190,8 @@ Requirements:
 ```
 
 The Evidence dataset contains provenance and content, not a hard-coded overall
-verification verdict. D separately documents the expected interpretation for
-acceptance review.
+verification verdict. The A/D handoff and deterministic acceptance tests define the
+expected paths without treating them as runtime model output.
 
 ### 5.4 Controlled replay
 
@@ -332,8 +334,8 @@ rather than repairing it into a stronger verdict.
 
 ### 8.4 Official announcement behavior
 
-M1 does not monitor official websites. D introduces a synthesized announcement in a
-later replay stage. The same document may serve as:
+M1 does not monitor official websites. The committed pack introduces a synthesized
+announcement in a later replay stage. The same document may serve as:
 
 - A newly ingested Signal that B attaches to the Case.
 - Evidence cited when verifying an earlier Claim.
@@ -409,7 +411,8 @@ A supplies at least one canonical Signal fixture for each of these cases:
 - Supported verification.
 - Refuted or insufficient verification.
 
-Every fixture must pass B's shared Pydantic models without field translation.
+Every fixture must pass the shared Pydantic models in `app/schemas.py` without field
+translation.
 
 ## 11. M1 acceptance criteria
 
@@ -465,22 +468,19 @@ The precise source, scenario and scheduling questions remain governed by INT-Q3,
 INT-Q4, INT-Q7, INT-Q10 and INT-Q11. M1 answers only the synthesized-data and
 controlled-replay portion of those questions.
 
-## 13. Integration gates and remaining decisions
+## 13. Frozen M1 integration decisions
 
-These items require coordination but do not block drafting A's internal implementation:
-
-1. A may author the first shared Pydantic `Signal`, `Claim` and `Evidence` models from
-   the existing central contract. B remains the contract steward and must review and
-   accept them before final integration; A must not create a parallel private model.
-2. The Case contract currently lists `claim_ids` but not all `signal_ids`. B must decide
-   how a Case exposes pure reposts and other Signals that add no Claim.
-3. D has approved the handoff design and must still deliver the exact staged posts,
-   evidence documents and expected business interpretations described in
-   `issues/01a-synthesized-data-handoff.md`.
-4. B must confirm the request and response bodies for `/api/v1/cases/dispatch` and
-   `/api/v1/claims/{claim_id}/verify`; this spec defines the required service semantics.
-5. An explicit `mixed` verification status is deferred unless B coordinates a central
-   contract enum change.
+1. A0 implements the existing central Signal, Claim and Evidence fields as the one
+   shared Pydantic model set in `app/schemas.py`; this is translation to code, not a
+   new schema design.
+2. A1 writes the complete deterministic synthesized pack from the approved A/D
+   handoff. Later copy refinements do not block implementation or acceptance.
+3. A hands every newly analyzed Signal to an injected async
+   `dispatch(signal_id)` interface. B-side Case storage and HTTP transport choices do
+   not change A's interface.
+4. The A endpoint request and response bodies are fixed in Task A5.
+5. Unresolved conflicting Evidence maps to `insufficient_evidence`; M1 does not add a
+   `mixed` enum.
 
 ## 14. M2 extension points
 

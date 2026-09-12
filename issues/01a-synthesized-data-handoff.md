@@ -1,6 +1,6 @@
 # A ↔ D — M1 synthesized data handoff
 
-Status: Discussion baseline
+Status: Approved M1 handoff baseline
 Last updated: 2026-09-12
 
 本文件記錄 A（source ingestion and verification）與 D（business demo data）在
@@ -43,9 +43,10 @@ Evidence：模擬的主管機關公告，明確列出 Demo 牌 B123 批次
 Result：supported
 ```
 
-## D 提供的資料
+## M1 scenario 資料責任
 
-D 負責 scenario 的內容與商業語意，包括：
+D 負責確認 scenario 的 stage 與商業語意；A1 負責把這些要求具體化成 committed
+deterministic dataset，包括：
 
 1. 每個 demo stage 出現的 synthesized posts。
 2. 每篇 post 的原文、來源、發布時間與 repost relationship。
@@ -55,6 +56,11 @@ D 負責 scenario 的內容與商業語意，包括：
    不是 hard-coded model output。
 
 D 不需要產生 runtime `signal_id` 或 `claim_id`；這些由 A 產生。
+
+D owner 已確認此設計。為了讓實作不被跨組排程卡住，A1 會依下列 stages 與 checklist
+直接提交一份完整、明確標示為 synthesized 的 deterministic M1 pack；該 commit 即為
+M1 baseline，後續若要調整文案或商業 expectation，走一般 reviewable diff，不是開工
+前置條件。
 
 ## 建議的 demo stages
 
@@ -143,12 +149,13 @@ LLM 只能依提供的 evidence 判定：
 
 ## A 與 B 的 contract gate
 
-M1 先完全沿用 `contracts/README.md`。B 需要提供共用的 Pydantic `Signal`、`Claim`
-與 `Evidence` models，A 的輸出 fixture 必須能直接通過這些 models，不能在 B 端做
-欄位 translation。
+M1 先完全沿用 `contracts/README.md`。A0 將既有的 `Signal`、`Claim` 與 `Evidence`
+欄位直接實作成 `app/schemas.py` 內的共用 Pydantic models；A 的輸出 fixture 與 B 的
+consumer 都 import 同一份 models，不在任何一端做欄位 translation。
 
-Case 需要能保存所有相關 Signal，包括沒有新 Claim 的 pure repost。現有 Case snapshot
-只有 `claim_ids`；是否加入 `signal_ids` 仍需由 B 依中央 contract 變更流程確認。
+Case 最終需要能保存所有相關 Signal，包括沒有新 Claim 的 pure repost。這是 B-side
+Case 實作細節，不影響 A 的交付：A 一律透過 injected `dispatch(signal_id)` handoff
+所有新 Signal。
 
 ## D handoff checklist
 
