@@ -224,7 +224,6 @@ idempotency and explicit repost semantics.
 
 ```text
 app/signal_store.py
-app/ingestion.py
 tests/test_signal_ingestion.py
 ```
 
@@ -236,8 +235,8 @@ Do not edit `app/store.py`, `app/schemas.py` or `app/main.py` in this task.
 - Create additive `CREATE TABLE IF NOT EXISTS` schema for Signals, Claims, Evidence,
   verification attempts and idempotency records as required by the spec.
 - Treat `(provider, source_id)` as the acquisition identity.
-- Expose a reservation/result boundary that tells the caller whether a provider source
-  is new before the caller invokes extraction. Completing a reservation accepts
+- Expose repository reservation/result methods that tell the caller whether a provider
+  source is new before the caller invokes extraction. Completing a reservation accepts
   already-extracted Claims; this task does not call an LLM or B.
 - Implement this exact synchronous service boundary; all methods are local SQLite
   operations:
@@ -395,7 +394,7 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 
 ### Goal
 
-Expose the central A API, compose loader/ingestion/extraction/verification services,
+Expose the central A API, compose loader/persistence/extraction/verification services,
 and complete one durable successful handoff for each newly analyzed Signal.
 
 ### Code prerequisites

@@ -79,16 +79,20 @@ class _InputModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class SourceRecord(_InputModel):
+class _SourceFields(_InputModel):
     provider: str = Field(min_length=1)
     source_id: str = Field(min_length=1)
     url: str = Field(min_length=1)
     author_ref: str | None
     published_at: datetime
-    retrieved_at: datetime
     raw_text: str = Field(min_length=1)
 
     _published_at_utc = field_validator("published_at", mode="before")(_utc_datetime)
+
+
+class SourceRecord(_SourceFields):
+    retrieved_at: datetime
+
     _retrieved_at_utc = field_validator("retrieved_at", mode="before")(_utc_datetime)
 
 
@@ -99,51 +103,36 @@ class SourceInput(_InputModel):
     duplicate_of_source_id: str | None = None
 
 
-class _DSourceItem(_InputModel):
+class _DSourceItem(_SourceFields):
     stage: int = Field(strict=True, ge=1)
-    provider: str = Field(min_length=1)
-    source_id: str = Field(min_length=1)
-    url: str = Field(min_length=1)
-    author_ref: str | None
-    published_at: datetime
-    raw_text: str = Field(min_length=1)
     source_relation: SourceRelation
     duplicate_of_source_id: str | None = None
-
-    _published_at_utc = field_validator("published_at", mode="before")(_utc_datetime)
 
 
 class _DSourceDataset(_InputModel):
     items: tuple[_DSourceItem, ...]
 
 
-class EvidenceInput(_InputModel):
+class _EvidenceFields(_InputModel):
+    evidence_id: str = Field(min_length=1)
+    url: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    publisher: str = Field(min_length=1)
+    published_at: datetime
+    retrieved_at: datetime
+    excerpt: str = Field(min_length=1)
+
+    _published_at_utc = field_validator("published_at", mode="before")(_utc_datetime)
+    _retrieved_at_utc = field_validator("retrieved_at", mode="before")(_utc_datetime)
+
+
+class EvidenceInput(_EvidenceFields):
     stage: int = Field(strict=True, ge=1)
-    evidence_id: str = Field(min_length=1)
-    url: str = Field(min_length=1)
-    title: str = Field(min_length=1)
-    publisher: str = Field(min_length=1)
-    published_at: datetime
-    retrieved_at: datetime
-    excerpt: str = Field(min_length=1)
-
-    _published_at_utc = field_validator("published_at", mode="before")(_utc_datetime)
-    _retrieved_at_utc = field_validator("retrieved_at", mode="before")(_utc_datetime)
 
 
-class _DEvidenceItem(_InputModel):
-    evidence_id: str = Field(min_length=1)
+class _DEvidenceItem(_EvidenceFields):
     claim_id: str = Field(min_length=1)
-    url: str = Field(min_length=1)
-    title: str = Field(min_length=1)
-    publisher: str = Field(min_length=1)
-    published_at: datetime
-    retrieved_at: datetime
-    excerpt: str = Field(min_length=1)
     stance: EvidenceStance
-
-    _published_at_utc = field_validator("published_at", mode="before")(_utc_datetime)
-    _retrieved_at_utc = field_validator("retrieved_at", mode="before")(_utc_datetime)
 
 
 class _DEvidenceDataset(_InputModel):

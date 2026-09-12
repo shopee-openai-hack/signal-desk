@@ -25,7 +25,6 @@ from .demo_loader import (
     InvalidReplayStageError,
     SourceRecord,
 )
-from .ingestion import SignalIngestionService
 from .schemas import Claim, Signal, Source, SourceRelation
 from .signal_store import (
     DispatchInProgress,
@@ -33,6 +32,7 @@ from .signal_store import (
     IdempotentRequestInProgress,
     InvalidDispatchState,
     InvalidIngestionState,
+    SourceReservation,
     SQLiteSignalStore,
     SignalStoreUnavailable,
 )
@@ -95,6 +95,21 @@ class SignalIngestRequest(BaseModel):
     duplicate_of_source_id: str | None
 
 
+def _source_reservation(payload: SignalIngestRequest) -> SourceReservation:
+    """Convert the HTTP input envelope to the canonical persistence command."""
+
+    return SourceReservation(
+        source=Source.model_validate(
+            {
+                **payload.source.model_dump(),
+                "retrieval_status": "succeeded",
+            }
+        ),
+        source_relation=payload.source_relation,
+        duplicate_of_source_id=payload.duplicate_of_source_id,
+    )
+
+
 class VerifyClaimRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -127,14 +142,12 @@ class SignalAPI:
     def __init__(
         self,
         store: SQLiteSignalStore,
-        ingestion: SignalIngestionService,
         extractor: ClaimExtractorProtocol,
         verifier: ClaimVerifierProtocol,
         evidence_loader: Callable[[list[str], int], list[EvidenceInput]],
         dispatcher: CaseDispatcherProtocol,
     ) -> None:
         self._store = store
-        self._ingestion = ingestion
         self._extractor = extractor
         self._verifier = verifier
         self._load_evidence = evidence_loader
@@ -152,20 +165,16 @@ class SignalAPI:
             return replay
 
         try:
-            reservation = self._ingestion.reserve_source(payload)
+            source_reservation = _source_reservation(payload)
+            reservation = self._store.reserve_source(source_reservation)
             if reservation.requires_extraction:
                 try:
                     claims = await self._extractor.extract(
                         reservation.signal_id,
-                        Source.model_validate(
-                            {
-                                **payload.source.model_dump(),
-                                "retrieval_status": "succeeded",
-                            }
-                        ),
+                        source_reservation.source,
                     )
                 except Exception as exc:  # noqa: BLE001 - API error is sanitized
-                    self._ingestion.fail_extraction(
+                    self._store.fail_extraction(
                         reservation.signal_id,
                         "Claim extraction failed after bounded attempts.",
                     )
@@ -174,12 +183,12 @@ class SignalAPI:
                         "Claim extraction failed; the Signal was retained for review.",
                         502,
                     ) from exc
-                signal = self._ingestion.complete_signal(
+                signal = self._store.complete_signal(
                     reservation.signal_id,
                     claims,
                 )
             else:
-                signal = self._ingestion.get_signal(reservation.signal_id)
+                signal = self._store.get_signal(reservation.signal_id)
                 if signal is None:
                     raise SignalStoreUnavailable(
                         "Reserved Signal could not be reconstructed"
@@ -189,7 +198,7 @@ class SignalAPI:
             # That distinction lets a failed dispatch retry while a completed one
             # remains a no-op.
             try:
-                dispatch_reservation = self._ingestion.begin_dispatch(
+                dispatch_reservation = self._store.begin_dispatch(
                     signal.signal_id
                 )
             except DispatchInProgress as exc:
@@ -216,13 +225,13 @@ class SignalAPI:
             try:
                 await self._dispatcher.dispatch(signal.signal_id)
             except Exception as exc:  # noqa: BLE001 - external details stay private
-                self._ingestion.abort_dispatch(signal.signal_id)
+                self._store.abort_dispatch(signal.signal_id)
                 raise SignalAPIError(
                     "case_dispatch_failed",
                     "The Signal was stored but could not be dispatched to a Case.",
                     502,
                 ) from exc
-            self._ingestion.complete_dispatch(signal.signal_id)
+            self._store.complete_dispatch(signal.signal_id)
 
             return self._complete(
                 operation,
@@ -270,7 +279,7 @@ class SignalAPI:
             return replay
 
         try:
-            claim = self._ingestion.get_claim(claim_id)
+            claim = self._store.get_claim(claim_id)
             if claim is None:
                 raise SignalAPIError(
                     "claim_not_found",
@@ -282,7 +291,7 @@ class SignalAPI:
                 payload.current_stage,
             )
             result = await self._verifier.verify(claim, evidence)
-            updated_claim = self._ingestion.append_verification(claim_id, result)
+            updated_claim = self._store.append_verification(claim_id, result)
             if result.sanitized_failure is not None:
                 raise SignalAPIError(
                     "claim_verification_failed",

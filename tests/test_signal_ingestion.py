@@ -7,22 +7,41 @@ import sqlite3
 
 import pytest
 
-from app.demo_loader import load_sources
-from app.ingestion import SignalIngestionService
-from app.schemas import Claim, ClaimScope, Entity, Evidence, VerificationStatus
+from app.demo_loader import SourceInput, load_sources
+from app.schemas import Claim, ClaimScope, Entity, Evidence, Source, VerificationStatus
 from app.signal_store import (
     DispatchInProgress,
     IdempotencyKeyConflict,
     IdempotentRequestInProgress,
+    IngestionReservation,
     InvalidDispatchState,
+    SourceReservation,
     SQLiteSignalStore,
 )
 
 
-def _service(path: Path) -> SignalIngestionService:
+def _service(path: Path) -> SQLiteSignalStore:
     store = SQLiteSignalStore(path)
     store.init_schema()
-    return SignalIngestionService(store)
+    return store
+
+
+def _reserve(
+    store: SQLiteSignalStore, source_input: SourceInput
+) -> IngestionReservation:
+    source = Source.model_validate(
+        {
+            **source_input.source.model_dump(),
+            "retrieval_status": "succeeded",
+        }
+    )
+    return store.reserve_source(
+        SourceReservation(
+            source=source,
+            source_relation=source_input.source_relation,
+            duplicate_of_source_id=source_input.duplicate_of_source_id,
+        )
+    )
 
 
 def _claim(signal_id: str, claim_id: str = "clm_oil_001") -> Claim:
@@ -52,7 +71,7 @@ def test_reserve_then_complete_round_trips_across_repository_instances(
 ) -> None:
     db_path = tmp_path / "signals.sqlite3"
     service = _service(db_path)
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
 
     assert reservation.is_new
     assert reservation.requires_extraction
@@ -71,12 +90,12 @@ def test_reserve_then_complete_round_trips_across_repository_instances(
 def test_repeated_source_identity_skips_extraction_and_dispatch(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
     source = load_sources(1)[0]
-    first = service.reserve_source(source)
+    first = _reserve(service, source)
     service.complete_signal(first.signal_id, [_claim(first.signal_id)])
     assert service.begin_dispatch(first.signal_id).should_dispatch
     service.complete_dispatch(first.signal_id)
 
-    repeated = service.reserve_source(source)
+    repeated = _reserve(service, source)
 
     assert repeated.signal_id == first.signal_id
     assert not repeated.is_new
@@ -91,7 +110,7 @@ def test_concurrent_reservations_create_one_canonical_signal(tmp_path: Path) -> 
     source = load_sources(1)[0]
 
     def reserve(_: int):
-        return SignalIngestionService(SQLiteSignalStore(db_path)).reserve_source(source)
+        return _reserve(SQLiteSignalStore(db_path), source)
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         reservations = list(executor.map(reserve, range(16)))
@@ -104,12 +123,12 @@ def test_concurrent_reservations_create_one_canonical_signal(tmp_path: Path) -> 
 
 def test_pure_repost_is_a_new_completed_signal_without_claims(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
-    original_reservation = service.reserve_source(load_sources(1)[0])
+    original_reservation = _reserve(service, load_sources(1)[0])
     original = service.complete_signal(
         original_reservation.signal_id, [_claim(original_reservation.signal_id)]
     )
 
-    repost_reservation = service.reserve_source(load_sources(2)[0])
+    repost_reservation = _reserve(service, load_sources(2)[0])
     repost = service.get_signal(repost_reservation.signal_id)
 
     assert repost_reservation.is_new
@@ -134,8 +153,8 @@ def test_identical_text_with_a_distinct_identity_is_retained(tmp_path: Path) -> 
         }
     )
 
-    first = service.reserve_source(original_input)
-    second = service.reserve_source(independent_input)
+    first = _reserve(service, original_input)
+    second = _reserve(service, independent_input)
 
     assert first.signal_id != second.signal_id
     assert first.is_new and second.is_new
@@ -144,13 +163,13 @@ def test_identical_text_with_a_distinct_identity_is_retained(tmp_path: Path) -> 
 
 def test_failed_extraction_preserves_source_and_is_idempotent(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
 
     service.fail_extraction(reservation.signal_id, "provider failed after two attempts")
     service.fail_extraction(reservation.signal_id, "provider failed after two attempts")
 
     restored = service.get_signal(reservation.signal_id)
-    repeated = service.reserve_source(load_sources(1)[0])
+    repeated = _reserve(service, load_sources(1)[0])
     assert restored is not None
     assert restored.source.raw_text == load_sources(1)[0].source.raw_text
     assert restored.claims == []
@@ -163,7 +182,7 @@ def test_verification_history_is_append_only_and_latest_success_is_canonical(
 ) -> None:
     db_path = tmp_path / "signals.sqlite3"
     service = _service(db_path)
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
     initial_claim = _claim(reservation.signal_id)
     service.complete_signal(reservation.signal_id, [initial_claim])
     evidence = Evidence(
@@ -218,7 +237,7 @@ def test_later_success_replaces_canonical_view_without_deleting_history(
 ) -> None:
     db_path = tmp_path / "signals.sqlite3"
     service = _service(db_path)
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
     claim = _claim(reservation.signal_id)
     service.complete_signal(reservation.signal_id, [claim])
     support = Evidence(
@@ -262,7 +281,7 @@ def test_later_success_replaces_canonical_view_without_deleting_history(
 
 def test_zero_model_attempt_verification_can_be_persisted(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
     claim = _claim(reservation.signal_id)
     service.complete_signal(reservation.signal_id, [claim])
 
@@ -341,12 +360,12 @@ def test_aborted_request_can_be_claimed_for_an_explicit_retry(tmp_path: Path) ->
 def test_failed_dispatch_is_released_then_retried_to_success(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
     source = load_sources(1)[0]
-    reservation = service.reserve_source(source)
+    reservation = _reserve(service, source)
     service.complete_signal(reservation.signal_id, [_claim(reservation.signal_id)])
 
     first_attempt = service.begin_dispatch(reservation.signal_id)
     service.abort_dispatch(reservation.signal_id)
-    repeated_source = service.reserve_source(source)
+    repeated_source = _reserve(service, source)
     retry = service.begin_dispatch(reservation.signal_id)
     service.complete_dispatch(reservation.signal_id)
 
@@ -354,7 +373,7 @@ def test_failed_dispatch_is_released_then_retried_to_success(tmp_path: Path) -> 
     assert not repeated_source.is_new
     assert repeated_source.requires_dispatch
     assert retry.should_dispatch
-    dispatched_repeat = service.reserve_source(source)
+    dispatched_repeat = _reserve(service, source)
     assert not dispatched_repeat.requires_dispatch
     assert not service.begin_dispatch(reservation.signal_id).should_dispatch
 
@@ -364,11 +383,11 @@ def test_concurrent_dispatch_has_one_owner_and_reports_other_as_in_progress(
 ) -> None:
     db_path = tmp_path / "signals.sqlite3"
     service = _service(db_path)
-    reservation = service.reserve_source(load_sources(1)[0])
+    reservation = _reserve(service, load_sources(1)[0])
     service.complete_signal(reservation.signal_id, [_claim(reservation.signal_id)])
 
     def claim_dispatch(_: int) -> str:
-        contender = SignalIngestionService(SQLiteSignalStore(db_path))
+        contender = SQLiteSignalStore(db_path)
         try:
             result = contender.begin_dispatch(reservation.signal_id)
         except DispatchInProgress as exc:
@@ -384,7 +403,7 @@ def test_concurrent_dispatch_has_one_owner_and_reports_other_as_in_progress(
 
 def test_reserved_and_extraction_failed_signals_cannot_dispatch(tmp_path: Path) -> None:
     service = _service(tmp_path / "signals.sqlite3")
-    reserved = service.reserve_source(load_sources(1)[0])
+    reserved = _reserve(service, load_sources(1)[0])
 
     with pytest.raises(InvalidDispatchState):
         service.begin_dispatch(reserved.signal_id)

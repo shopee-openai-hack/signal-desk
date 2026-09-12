@@ -23,7 +23,6 @@ from .claim_extraction import (
 from .claim_verification import ClaimVerificationService, OpenAIVerificationProvider
 from .config import Settings
 from .demo_loader import EvidenceInput, load_evidence
-from .ingestion import SignalIngestionService
 from .planner import PlanGenerationError, Planner
 from .rate_limit import BoundedConcurrency, InMemoryRateLimiter
 from .schemas import ConfigResponse, GoalRequest, HealthResponse, RunResponse
@@ -191,10 +190,8 @@ def create_app(
         app_claim_verifier = claim_verifier
 
     app_case_dispatcher = case_dispatcher or NoopCaseDispatcher()
-    app_signal_ingestion = SignalIngestionService(app_signal_store)
     app_signal_api = SignalAPI(
         app_signal_store,
-        app_signal_ingestion,
         app_claim_extractor,
         app_claim_verifier,
         evidence_loader,
