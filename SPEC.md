@@ -139,6 +139,11 @@ copies them into its store nor turns their business expectations into verifier o
 External-source excerpts retain D's “verify before demo” gate and are never fetched
 live during replay.
 
+Stages 1–6 remain the presentation's fixed core replay. Stages 101–110 are an
+optional, input-only social-post showcase for extraction, source relationship,
+conflict and scope-handling demonstrations. They do not change the six core
+case-state expectations and are not part of the timed presentation.
+
 ### 5.2 Source dataset shape
 
 The D source dataset uses a flat envelope:
@@ -164,7 +169,8 @@ The D source dataset uses a flat envelope:
 Requirements:
 
 - `stage` is a positive integer used for controlled replay, not a production time
-  scheduler.
+  scheduler. Stages 1–6 are the core replay; stages 101–110 are the optional signal
+  showcase documented in `docs/demo/signal-showcase.md`.
 - `published_at` is explicit UTC. D does not provide source `retrieved_at`, so A
   deterministically normalizes it to the same value as `published_at`.
 - `source_id` is unique within a provider.

@@ -65,6 +65,116 @@
       "raw_text": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品由泰山、福懋及福壽製成共 501 項產品，可重新上架。",
       "source_relation": "original",
       "duplicate_of_source_id": null
+    },
+    {
+      "stage": 101,
+      "provider": "threads",
+      "source_id": "post_showcase_001",
+      "url": "https://example.test/post/showcase/001",
+      "author_ref": "showcase_user_001",
+      "published_at": "2026-06-30T03:15:00Z",
+      "raw_text": "昨晚在新北買的泰山大豆沙拉油，開封後聞起來怪怪的。店員說可能只是保存問題，但我擔心是不是有批次正在回收，有人知道嗎？",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 102,
+      "provider": "threads",
+      "source_id": "post_showcase_002",
+      "url": "https://example.test/post/showcase/002",
+      "author_ref": "showcase_user_002",
+      "published_at": "2026-06-30T03:48:00Z",
+      "raw_text": "轉貼：昨晚在新北買的泰山大豆沙拉油，開封後聞起來怪怪的……有人知道嗎？",
+      "source_relation": "repost",
+      "duplicate_of_source_id": "post_showcase_001"
+    },
+    {
+      "stage": 103,
+      "provider": "threads",
+      "source_id": "post_showcase_003",
+      "url": "https://example.test/post/showcase/003",
+      "author_ref": "showcase_user_003",
+      "published_at": "2026-06-30T05:05:00Z",
+      "raw_text": "我在台中買的福壽大豆沙拉油瓶身也有原料批號 315-1150404。賣場今天先把同批商品移到後台，客服說還在等正式通知。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 104,
+      "provider": "threads",
+      "source_id": "post_showcase_004",
+      "url": "https://example.test/post/showcase/004",
+      "author_ref": "showcase_user_004",
+      "published_at": "2026-06-30T05:32:00Z",
+      "raw_text": "我家的福壽大豆沙拉油也是原料批號 315-1150404，已經用了半瓶，味道和外觀都正常，所以不一定每瓶都有問題吧。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 105,
+      "provider": "threads",
+      "source_id": "post_showcase_005",
+      "url": "https://example.test/post/showcase/005",
+      "author_ref": "showcase_user_005",
+      "published_at": "2026-06-30T06:10:00Z",
+      "raw_text": "我剛問品牌客服，對方說原料批號 315-1150404 沒有使用中聯油脂，也不在回收範圍內。先不要看到同品牌就恐慌。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 106,
+      "provider": "threads",
+      "source_id": "post_showcase_006",
+      "url": "https://example.test/post/showcase/006",
+      "author_ref": "showcase_user_006",
+      "published_at": "2026-06-30T06:45:00Z",
+      "raw_text": "我的補充：我家這瓶標的是 315-1150398，跟原貼提到的批次可能不同。轉貼：昨晚在新北買的泰山大豆沙拉油，開封後聞起來怪怪的……",
+      "source_relation": "repost",
+      "duplicate_of_source_id": "post_showcase_001"
+    },
+    {
+      "stage": 107,
+      "provider": "threads",
+      "source_id": "post_showcase_007",
+      "url": "https://example.test/post/showcase/007",
+      "author_ref": "showcase_user_007",
+      "published_at": "2026-07-01T08:20:00Z",
+      "raw_text": "食藥署已經證實泰山所有食用油都有問題，平台上的泰山油品應該全部下架。",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 108,
+      "provider": "threads",
+      "source_id": "post_showcase_008",
+      "url": "https://example.test/post/showcase/008",
+      "author_ref": "showcase_user_008",
+      "published_at": "2026-07-01T09:05:00Z",
+      "raw_text": "我買的泰山玄米油運送時瓶蓋破了，整箱漏油，賣家一直沒有回覆。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 109,
+      "provider": "threads",
+      "source_id": "post_showcase_009",
+      "url": "https://example.test/post/showcase/009",
+      "author_ref": "showcase_user_009",
+      "published_at": "2026-07-07T09:20:00Z",
+      "raw_text": "店家通知我，使用受影響大豆油製作的調理食品也要先下架。我買的罐頭標示用了福壽原料，但包裝上沒有原料批號。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 110,
+      "provider": "threads",
+      "source_id": "post_showcase_010",
+      "url": "https://example.test/post/showcase/010",
+      "author_ref": "showcase_user_010",
+      "published_at": "2026-07-23T09:30:00Z",
+      "raw_text": "新聞說 501 項產品可以重新上架，代表泰山、福懋和福壽的油現在全部都安全了，之前下架的商品可以直接恢復販售。",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
     }
   ]
 }
