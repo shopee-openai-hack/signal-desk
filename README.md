@@ -2,34 +2,139 @@
 
 Hackathon starter: Vite + React + TypeScript + Tailwind + shadcn/ui components + TanStack Query; Python + FastAPI + Pydantic + httpx + uv; OpenAI SDK + a bounded lightweight loop; SQLite; Railway; GitHub Actions.
 
-## Local development
+Deployed infrastructure, verification evidence and remaining gates: [INFRA_STATUS.md](INFRA_STATUS.md).
+
+## Local development（隊友與 Codex 從這裡開始）
+
+在 repo 根目錄工作。需要 Git、Node.js 22（含 npm）、uv；Python 使用 3.12，
+`uv sync` 會依需要準備 Python。一般本機開發不需要 Docker、Railway CLI 或雲端存取權。
+
+### 1. 初次設定
+
+尚未下載專案時：
 
 ```sh
-cp .env.example .env
-uv sync --frozen --dev
+git clone https://github.com/shopee-openai-hack/starter-repo.git
+cd starter-repo
+```
+
+已有 checkout 就進入該目錄，不要重複 clone。先檢查 `git status --short`，保留既有修改。
+
+```sh
+node --version
+uv --version
+# 保留既有 .env，不覆寫隊友已設定的 key。
+test -f .env || cp .env.example .env
+uv sync --frozen --dev --python 3.12
+(cd frontend && npm ci)
+```
+
+每個 checkout／worktree 各自有 `.env`、`.venv`、`frontend/node_modules` 和本機 SQLite。
+`.env` 與 DB 不進 Git；不要把 production 的變數整包複製到本機。
+
+### 2. 開兩個 terminal
+
+Terminal A，在 repo 根目錄啟動 FastAPI：
+
+```sh
 uv run uvicorn app.main:app --reload --env-file .env --port 8000
 ```
 
-In another terminal:
+Terminal B，在 repo 根目錄啟動 Vite：
 
 ```sh
 cd frontend
-npm ci
-npm run dev
+npm run dev -- --strictPort
 ```
 
-Open http://localhost:5173. Vite proxies `/api` to FastAPI; `PUBLIC_ORIGIN` in `.env` matches this origin. SQLite initializes at `data/app.sqlite3` on startup. No separate database server. The bundled action planner is replaceable sample product code, not a required product direction. Without an OpenAI key it is explicitly demo mode; provider failures never fall back silently.
+開啟 **http://localhost:5173**。Vite 會將 `/api` 和 `/healthz` 轉送到
+`http://localhost:8000`，前端程式使用相對 API 路徑。停止時在兩個 terminal 各按 Ctrl+C。
+`--strictPort` 避免 Vite 自動換 port，導致與 PUBLIC_ORIGIN 不一致。
 
-For single-origin local preview, run `npm run build` in `frontend`, set `PUBLIC_ORIGIN=http://localhost:8000` in `.env`, then start FastAPI. To add shadcn components, run its CLI from `frontend`; `components.json`, the `@` alias and CSS tokens are included.
+### 3. 本機環境變數
 
-## Checks
+在根目錄 `.env` 設定；變更後重啟後端。已 export 的 shell 環境變數會優先於 `.env`，
+請使用一般 terminal，不要在載入 Railway production 變數的 shell 裡啟動本機服務。
+
+| 變數 | 本機值／用途 |
+| --- | --- |
+| `APP_ENV` | `development` |
+| `DATABASE_PATH` | `data/app.sqlite3`；後端啟動時自動初始化，不需另外架 DB |
+| `PUBLIC_ORIGIN` | `http://localhost:5173`；與瀏覽器實際開啟的 origin 一致 |
+| `SESSION_COOKIE_SECURE` | `false`；本機使用 HTTP |
+| `SESSION_SECRET` | 範例值只供本機；保持不變才能沿用匿名 session |
+| `OPENAI_API_KEY` | 空白即可開發，UI 會顯示範例模式；需要真實 AI 時自行加入 backend key |
+| `OPENAI_MODEL` | 預設 `gpt-4o-mini` |
+
+Railway 上的 key 不會自動同步到本機。不要把 key 貼到聊天、commit、`VITE_*` 或前端程式。
+真實模式的提交會消耗 API 額度；provider 失敗會回報錯誤，不會偷偷改用 demo 結果。
+
+### 4. 確認服務正常
+
+兩個服務都啟動後，在另一個 terminal 執行：
+
+```sh
+curl -fsS http://localhost:8000/healthz
+curl -fsS http://localhost:5173/healthz
+curl -fsS http://localhost:5173/api/config
+```
+
+健康回應應包含 `status: "ok"`、`database: "ok"`；沒有 key 時 `mode` 為 `demo`。
+在 UI 輸入一個目標並提交，確認顯示結果與歷史紀錄，再重新整理確認紀錄仍在。
+匿名歷史依 cookie 區分；請固定使用 `localhost`，不要與 `127.0.0.1` 混用。
+
+### 5. 提交前檢查
+
+在 repo 根目錄：
 
 ```sh
 uv run pytest
-cd frontend && npm run typecheck && npm run build
+(cd frontend && npm run typecheck && npm run build)
+git diff --check
 ```
 
-SQLite tests use temporary real files, including atomic quota admission, isolation, restart persistence, and error handling. Model-loop tests use a fake provider and make no paid API calls.
+測試使用臨時 SQLite 與 fake provider，不會呼叫付費 AI。
+只有修改依賴時才刻意更新 lockfile；不要為了跑起來刪除 `uv.lock` 或 `package-lock.json`。
+Docker 修改可另外執行 `docker build -t hackathon-local .`，需要啟動 Docker daemon。
+
+### 單一 origin 的 production build 預覽
+
+先停止佔用 8000 的後端，再於根目錄執行：
+
+```sh
+(cd frontend && npm run build)
+PUBLIC_ORIGIN=http://localhost:8000 uv run uvicorn app.main:app --env-file .env --port 8000
+```
+
+開啟 http://localhost:8000，由 FastAPI 同時提供前端與 API。這只覆寫此次程序的 origin，
+不更動 `.env`；回到雙 terminal 開發時使用原本指令。`vite preview` 本身不代表完整後端驗證。
+
+### 常見問題
+
+| 現象 | 處理方式 |
+| --- | --- |
+| 5173 已被占用 | 找出既有開發程序，確認是否可沿用或停止；不要盲目 kill 隊友程序 |
+| API proxy connection refused | 確認 Terminal A 正常啟動且 port 為 8000 |
+| 提交回傳 403 | 檢查 PUBLIC_ORIGIN、網址的 host／port 是否完全一致，重啟後端 |
+| 本機要求 Railway volume／HTTPS | 清除 shell 中的 production／RAILWAY_* 覆寫，使用本機 `.env` |
+| 429／額度已達上限 | 每分鐘與每日限制是預期行為；只在自己的本機 `.env` 調整測試額度 |
+| 改了 key 仍是 demo | 確認修改根目錄 `.env`、沒有 shell 覆寫，並重啟後端 |
+| 歷史紀錄消失 | 檢查 cookie、SESSION_SECRET、host 與 DATABASE_PATH；不要先刪 DB |
+
+需要空白測試資料時，用另一個 `DATABASE_PATH` 啟動本機後端，保留原資料庫。
+
+### 給 Codex 的開工提示
+
+可直接貼給隊友的 Codex：
+
+> 請先讀 AGENTS.md 與 README.md 的 Local development，再檢查 git status。
+> 保留現有修改與 .env，依 lockfile 安裝依賴，啟動本機前後端並驗證 health 與 UI。
+> 沒有 OPENAI_API_KEY 就用 demo 模式。實作後執行 README 的提交前檢查，
+> 回報修改與驗證結果；除非我授權，不要 commit、push 或變更 Railway production。
+
+程式入口：`frontend/src/App.tsx` 是 UI，`app/main.py` 是 HTTP API，
+`app/schemas.py` 是資料合約，`app/planner.py` 是 AI 邏輯，`app/store.py` 是 SQLite。
+新增 shadcn 元件時從 `frontend` 執行其 CLI；既有 alias、tokens 和 components.json 可沿用。
 
 ## Railway
 
