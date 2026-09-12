@@ -1,0 +1,16 @@
+{
+  "signal_id": "sig_oil_repost_001",
+  "source": {
+    "provider": "synthesized",
+    "source_id": "post_oil_repost_001",
+    "url": "https://example.test/synthesized/posts/oil-repost-001",
+    "author_ref": "fictional_user_002",
+    "published_at": "2026-09-12T02:10:00Z",
+    "retrieved_at": "2026-09-12T02:12:00Z",
+    "raw_text": "【合成示範資料／純轉貼】轉貼 post_oil_001 的虛構內容，沒有加入新的親身經驗或事實陳述。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "repost",
+  "duplicate_of_signal_id": "sig_oil_initial_001",
+  "claims": []
+}

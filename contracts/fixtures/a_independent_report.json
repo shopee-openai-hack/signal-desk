@@ -1,0 +1,43 @@
+{
+  "signal_id": "sig_oil_independent_001",
+  "source": {
+    "provider": "synthesized",
+    "source_id": "post_oil_independent_001",
+    "url": "https://example.test/synthesized/posts/oil-independent-001",
+    "author_ref": "fictional_user_003",
+    "published_at": "2026-09-12T02:25:00Z",
+    "retrieved_at": "2026-09-12T02:30:00Z",
+    "raw_text": "【合成示範資料】我手上的 Demo 牌食用油也是 B123 批次，今天開封時聞到異味；我懷疑問題可能限於 B123，但尚未送驗。這是另一位虛構使用者的獨立回報。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "independent_report",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_oil_independent_experience_001",
+      "signal_id": "sig_oil_independent_001",
+      "kind": "experience",
+      "quote": "我手上的 Demo 牌食用油也是 B123 批次，今天開封時聞到異味",
+      "normalized_statement": "另一名虛構使用者表示 Demo 牌 B123 批次食用油開封時有異味",
+      "entities": [
+        {"type": "brand", "name": "Demo"}
+      ],
+      "scope": {"region": null, "batch": "B123", "time_window": null},
+      "verification_status": "not_applicable",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_oil_independent_hypothesis_001",
+      "signal_id": "sig_oil_independent_001",
+      "kind": "hypothesis",
+      "quote": "我懷疑問題可能限於 B123",
+      "normalized_statement": "Demo 牌食用油的疑似問題可能限於 B123 批次",
+      "entities": [
+        {"type": "brand", "name": "Demo"}
+      ],
+      "scope": {"region": null, "batch": "B123", "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    }
+  ]
+}

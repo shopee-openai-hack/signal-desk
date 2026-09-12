@@ -1,0 +1,42 @@
+{
+  "signal_id": "sig_oil_notice_001",
+  "source": {
+    "provider": "synthesized",
+    "source_id": "notice_oil_support_001",
+    "url": "https://example.test/synthesized/notices/oil-support-001",
+    "author_ref": "fictional_food_authority",
+    "published_at": "2026-09-12T03:00:00Z",
+    "retrieved_at": "2026-09-12T03:01:00Z",
+    "raw_text": "【合成示範公告／非真實機關】虛構抽驗初報稱 Demo 牌 B123 批次的一件樣本未符合示範標準；本公告及機關皆為 hackathon 測試資料。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "original",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_oil_notice_fact_001",
+      "signal_id": "sig_oil_notice_001",
+      "kind": "fact",
+      "quote": "Demo 牌 B123 批次的一件樣本未符合示範標準",
+      "normalized_statement": "合成抽驗初報稱 Demo 牌 B123 批次的一件樣本未符合示範標準",
+      "entities": [
+        {"type": "brand", "name": "Demo"}
+      ],
+      "scope": {"region": null, "batch": "B123", "time_window": null},
+      "verification_status": "supported",
+      "evidence": [
+        {
+          "evidence_id": "ev_oil_support_b123_001",
+          "claim_id": "clm_oil_notice_fact_001",
+          "url": "https://example.test/synthesized/notices/oil-support-001",
+          "title": "Synthesized B123 initial inspection notice (fictional)",
+          "publisher": "Synthesized Food Authority (fictional)",
+          "published_at": "2026-09-12T03:00:00Z",
+          "retrieved_at": "2026-09-12T03:01:00Z",
+          "excerpt": "【合成示範證據】Demo 牌 B123 批次的一件樣本未符合示範標準；本段落不是現實世界的檢驗結果。",
+          "stance": "supports"
+        }
+      ]
+    }
+  ]
+}
