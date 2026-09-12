@@ -71,7 +71,7 @@ class AgentStatus(StrictModel):
     waiting_reason: str | None = None
     next_action: str | None = None
     observed_at: datetime
-    source: Literal["backend"] = "backend"
+    source: Literal["backend", "backend_replay"] = "backend"
 
 
 class SignalRead(Signal):

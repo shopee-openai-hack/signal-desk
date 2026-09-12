@@ -1,129 +1,50 @@
-# Signal Desk 前端與可互動 mock
+# Signal Desk：FastAPI 受控 Demo
 
-這個目錄包含四個前端入口與一個獨立的本機 HTTP mock service。mock 使用與
-[`contracts/README.md`](../contracts/README.md) 相同的 `/api/v1` 路徑和 snake_case
-資料語意；前端元件只透過相對 URL 呼叫 API，不直接 import fixture。主要回放資料
-來自 `contracts/fixtures/demo/` 的中聯油脂六段核准案例，不是模型的 hard-coded
-答案；商品九筆均標示 `is_simulated: true`。
+四個頁面（訊號收件匣、案件列表、案件詳情與 Trace）都透過相對 `/api/v1/demo/*` HTTP requests 讀取同一個 FastAPI 後端。商品核可與模擬執行由後端寫入 SQLite；重新整理或重啟後端仍會保留操作結果。前端不再連接獨立 Node mock service。
 
-## 本機啟動
+## 啟動
 
-先安裝依賴：
+在 repo 根目錄啟動後端，再於另一個 terminal 啟動前端：
 
 ```sh
-npm ci
+.venv/bin/uv run uvicorn app.main:app --reload --env-file .env --port 8000
+cd frontend && npm ci && npm run dev -- --strictPort
 ```
 
-需要 mock 時開兩個 terminal：
+開啟 <http://localhost:5173>。Vite 把 `/api` 代理到 `localhost:8000`；部署時 FastAPI 直接提供同一組端點與前端靜態檔。受控回放預設停在 Stage 3，使用 `DATABASE_PATH` 指向的 SQLite 檔案保存狀態。使用另一個 `DATABASE_PATH` 可建立獨立的乾淨 demo 資料庫。
+根目錄 `.env` 的 `PUBLIC_ORIGIN` 必須與瀏覽器網址一致（預設 `http://localhost:5173`），否則後端會拒絕修改請求。若需要換後端 port，可設定前端啟動環境變數 `VITE_API_TARGET=http://localhost:<port>`。
 
-```sh
-# Terminal A
-npm run mock
+## 後端端點
 
-# Terminal B
-npm run dev:mock -- --strictPort
-```
-
-開啟 <http://localhost:5173>。Vite 的 `mock` mode 將 `/api` 和 `/healthz`
-proxy 到 `http://localhost:4100`。mock state 預設保存到系統暫存目錄
-`/tmp/shopee-openai-hack-demo-state.json`，所以重新整理或重啟 mock service 後仍會
-保留核可、執行與商品狀態。要指定路徑或清掉資料，可執行：
-
-```sh
-MOCK_STATE_PATH=/tmp/my-signal-desk.json npm run mock
-# 舞台預設為 Stage 3；可明確重設舞台或從零開始
-curl -fsS -X POST http://localhost:4100/api/v1/mock/reset \
-  -H 'content-type: application/json' -d '{"stage":3}'
-curl -fsS -X POST http://localhost:4100/api/v1/mock/reset \
-  -H 'content-type: application/json' -d '{"stage":0}'
-
-# 若現有 state 已有核可／執行紀錄，必須明確確認才會清除
-curl -fsS -X POST http://localhost:4100/api/v1/mock/reset \
-  -H 'content-type: application/json' -d '{"stage":3,"confirm":true}'
-```
-
-若要接目前 FastAPI，使用原本的 `npm run dev`；它會把相同相對 API proxy 到
-`http://localhost:8000`。A+B 已提供訊號、案件列表／詳情／時間軸、專員觀測、
-ingest、verify 與 versioned advance。商品目錄、核可／執行、Trace 讀取及六段
-回放控制器仍只有 Node mock 路徑，因此四頁完整 demo 請用 `dev:mock`。
-前端的「下一段證據」按鈕只在 mock 模式顯示；真實 FastAPI 的 advance 必須由
-控制器帶入 `expected_version` 與 A 已保存的 `verification_updates`。
-
-## 頁面與互動
-
-- **案件列表** `/cases`：比較業務影響、優先級、案件版本、專員可觀測狀態和下次追蹤。
-- **訊號收件匣** `/inbox`：閱讀原文、來源、轉傳／獨立回報關係與查核狀態。
-- **案件詳情** `/cases/:case_id/overview`：概覽、陳述、證據、未知事項、下一步與專員狀態。
-- **相關商品** `/cases/:case_id/products`：選取候選模擬商品，先核可，再明確執行；已核可商品若案件版本改變會被阻擋。
-- **案件時間軸** `/cases/:case_id/timeline`：查看不可覆寫的案件事件、版本、理由與來源。
-- **Trace 回放** `/trace`：播放清楚標示為 `saved_mock` 的唯讀情境；主要 trace 使用同一份六段核准案例，展開後可看 search／read／tool／decision／retry／wait 活動、輸入輸出、來源證據、理由摘要與案件前後完整欄位。播放支援前後跳步、速度調整與人工核可停頓；目前／未來階段由本機回放游標逐步揭露，不會觸發寫入或付費呼叫。
-
-mock 內建兩個 trace：中聯油脂六段主線，以及隔離的第一次失敗、第二次以相同
-execution record 重試成功的例外主線。例外情境不會改變主線的 Stage 4 核可或
-商品狀態；以 `scenario: "failure_retry"` 重置時，`prod_007` 才會在第一次執行
-失敗。重試會更新同一筆 execution 的 `attempts`，不會製造第二筆成功操作。完整 phases／activities read
-model 與 producer／consumer 對照見
-[`TRACE_CONTRACT_PROPOSAL.md`](TRACE_CONTRACT_PROPOSAL.md)；既有 `steps` 欄位仍保留
-供舊版 Trace consumer 相容。
-
-## Mock API 差異與整合缺口
-
-以下 endpoints 對齊中央契約，可供後端完成後直接替換：
-
-| Method | Path | 用途 |
+| Method | Path | 前端用途 |
 | --- | --- | --- |
-| GET | `/api/v1/cases` | 案件列表 |
-| GET | `/api/v1/cases/{case_id}` | 案件 snapshot |
-| GET | `/api/v1/cases/{case_id}/timeline` | 案件 immutable timeline |
-| GET | `/api/v1/products` | 模擬商品 |
-| GET | `/api/v1/mock/status` | 目前回放舞台、資料來源與 provenance |
-| POST | `/api/v1/cases/{case_id}/approvals` | 以案件版本建立人工核可 |
-| POST | `/api/v1/approvals/{approval_id}/execute` | 執行核可的模擬下架 |
-| POST | `/api/v1/cases/{case_id}/advance` | 新證據造成版本變更（契約列出的 provisional B endpoint） |
+| GET | `/api/v1/demo/status` | 目前 Stage、來源與已保存的核可／執行數 |
+| POST | `/api/v1/demo/reset` | 明確重置至 Stage 0 或 3；已有操作紀錄時需 `confirm: true` |
+| POST | `/api/v1/demo/advance` | 以 `expected_stage` 揭露下一段；Stage 4 的三筆商品必須先核可並執行 |
+| GET | `/api/v1/demo/signals` | 來源、陳述、證據與案件關聯 |
+| GET | `/api/v1/demo/cases`、`/cases/{case_id}` | 案件列表與詳情 |
+| GET | `/api/v1/demo/cases/{case_id}/timeline` | 不可覆寫的事件時間軸 |
+| GET | `/api/v1/demo/cases/{case_id}/agent-status` | 已保存的專員觀測，不代表現在有模型正在執行 |
+| GET | `/api/v1/demo/products` | 九筆模擬商品與目前上架狀態 |
+| GET/POST | `/api/v1/demo/cases/{case_id}/approvals` | 讀取或建立人工核可，連同逐項 execution 結果 |
+| POST | `/api/v1/demo/approvals/{approval_id}/execute` | 明確執行模擬下架；失敗可用新 idempotency key 重試同一 execution |
+| GET | `/api/v1/demo/traces`、`/traces/{trace_id}` | 六段主線與失敗重試的唯讀保存 Trace |
 
-下列 read models 原先由 mock 提案，現在已列入中央契約；各 producer 的實作
-狀態分別標示：
+所有 mutation（reset 除外）使用 `Idempotency-Key`。版本／Stage 衝突會回 `409`，錯誤格式為 `{"error":{"code":"...","message":"...","details":{}}}`。Stage 是回放游標，案件版本是判讀修訂；Stage 2 純轉傳只增加訊號和 `signal_added` 時間軸，案件仍為 v1，Stage 3–6 為 v2–v5。
 
-- `GET /api/v1/signals`：收件匣 read model；A+B 已在 FastAPI 實作。
-- `GET /api/v1/cases/{case_id}/agent-status`：已保存的專員觀測；A+B 已在 FastAPI 實作，不是常駐 agent 或即時執行證明。
-- `GET /api/v1/cases/{case_id}/approvals`：前端 reload 後讀取保存核可與 execution 結果。
-- `GET /api/v1/traces`、`GET /api/v1/traces/{trace_id}`：保存 trace snapshot，只讀播放。
-- `POST /api/v1/mock/reset`：明確指定 Stage 0 或 Stage 3 重建 mock state；有核可／執行紀錄時需 `confirm: true`。
+## 操作路徑
 
-所有寫入（reset 除外）要求 `Idempotency-Key`；重複 key 會 replay 同一 response。
-案件版本不符回傳 `409 version_conflict`，錯誤格式維持中央契約的
-`{"error":{"code":"...","message":"...","details":{}}}`。
+1. 在案件頁從 Stage 3 進到 Stage 4。三筆 `confirmed`（`prod_001`、`prod_003`、`prod_005`）仍為 `active`；`prod_002` 批號未知，不可核可。
+2. 在商品頁勾選三筆，建立核可，再點明確執行。重新整理後商品、核可與逐項結果仍可見。未完成此步會被後端阻擋進入 Stage 5。
+3. 進入 Stage 5，`prod_007`、`prod_009` 為新候選，不繼承舊核可。Stage 6 只排除 `prod_009`，不自動恢復既有下架商品。
+4. Trace 頁展示保存的 phases／activities、證據引用、前後快照與重試歷史；播放不觸發上述 mutation。
+5. 可在任一頁重置 Stage 3 或從 Stage 0 逐段回放；Stage 0 的案件列表為空，頂部仍有「下一 Stage」控制。
 
-Stage 是回放游標，與案件 `version` 分開。Stage 2 的純轉傳新增收件匣訊號與
-`signal_added` 時間軸紀錄，案件判讀仍是 v1；Stage 3–6 對應 v2–v5。
-升級前的 mock state 會遷移案件、時間軸與核可版本，保留執行與商品狀態；
-舊格式的 mutation response 快取會清除，以免重播錯誤版本。
+這是**由 FastAPI 保存與提供的受控案例回放**，資料快照來自 `contracts/fixtures/demo/backend_replay.json`，不是執行中的 OpenAI 判讀。正常 A+B ingest／verify／Case API 保留在 `/api/v1`，與 demo namespace 的 SQLite 狀態分開；真實訊號尚不會自動變成受控回放的一段。Trace 也是保存的合成紀錄，不是現場 agent telemetry。外部公告及新聞仍需 demo 前逐字核對，商品均為模擬 listing。
 
-## 六段回放與人工邊界
-
-預設狀態是 Stage 3：三則訊號已進同一案件，案件為 `risk`／`high`／
-`investigating`，九筆商品全部 `active`，沒有核可或執行紀錄。`POST
-/api/v1/cases/{case_id}/advance` 依序揭露下一段。Stage 4 只會進入
-`awaiting_approval`；`prod_001`、`prod_003`、`prod_005` 是唯一可核可商品，
-`prod_002` 因批號未知會被拒絕。只有人工核可後再呼叫 execution endpoint，三筆
-才會變成 `delisted`。Stage 5 新增 `prod_007`、`prod_009` 時保持 `active`，
-不繼承舊核可；Stage 6 只把回放映射的 `prod_009` 改成 `excluded`，保留
-`prod_007` candidate，也不自動恢復既有下架商品。
-
-來源頁、案件頁和 trace 會標示「回放：2026-06-30 至 2026-07-23」、外部證據、
-模擬 listing 與受控回放的界線，以及公告／新聞的「demo 前需逐字核對」提醒。
-`GET /api/v1/mock/status` 可取得同一組 provenance。`MOCK_STATE_PATH` 預設使用
-`/tmp/shopee-openai-hack-demo-state.json`，與舊版 mock state 分開；若指定路徑
-已有不同資料集，mock 會先保留成 `.legacy-<timestamp>.json` 再建立新的 state。
-
-## 驗證
+原 Node mock 檔案只作歷史 fixture 與回歸測試，不參與前端執行。驗證命令：
 
 ```sh
-npm run test:mock
-npm run typecheck
-npm run build
+.venv/bin/uv run pytest -q
+cd frontend && npm run typecheck && npm run build && npm run test:mock
 ```
-
-mock HTTP 測試涵蓋讀取、持久化與重啟、核可／執行 idempotency、案件版本衝突、
-失敗可見與同一 execution retry。瀏覽器 UI／實際 FastAPI 整合仍需由整合負責人
-另行驗證；本 mock 成功不代表雲端部署或真實平台操作完成。

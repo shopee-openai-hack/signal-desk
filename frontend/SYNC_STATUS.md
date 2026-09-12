@@ -3,15 +3,13 @@
 ## Current integration checkpoint
 
 The notes below record C's earlier handoff and include historical branch and
-test status. The current `main` contains A+B's FastAPI ingest, verify, Case,
-timeline, inbox and saved agent-status endpoints together with C's four-page
-UI and rich vertical Trace reader. The full six-stage presentation still runs
-through the separate Node mock; FastAPI has no product approval/execution,
-saved Trace producer or replay controller yet. The mock now treats Stage 2 as
-a pure repost (`signal_added`, Case v1 unchanged); Stages 3–6 use Case v2–v5.
-The UI exposes the reason-only replay action only in mock mode and uses
-`demo_stage` for Stage 4 product eligibility. A stale approval blocks its own
-execution but does not block creating a fresh approval for Stage 5 products.
+test status. The current UI sends every page read and mutation to FastAPI
+`/api/v1/demo/*`; Node mock is no longer in the running frontend path. FastAPI
+owns the controlled replay, product approvals/execution, persistence and saved
+Trace. A+B's live APIs remain at `/api/v1/*` with separate state. Stage 2 is a
+pure repost (`signal_added`, Case v1 unchanged); Stages 3–6 use Case v2–v5.
+The UI uses replay `stage` for Stage 4 eligibility. A stale approval blocks
+its own execution but does not block a new Stage 5 approval.
 
 ## 可用基準
 

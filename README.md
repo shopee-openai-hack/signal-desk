@@ -53,6 +53,11 @@ npm run dev -- --strictPort
 `http://localhost:8000`，前端程式使用相對 API 路徑。停止時在兩個 terminal 各按 Ctrl+C。
 `--strictPort` 避免 Vite 自動換 port，導致與 PUBLIC_ORIGIN 不一致。
 
+Signal Desk 四頁使用 FastAPI 的 `/api/v1/demo/*` 受控回放端點，預設從
+Stage 3 開始，商品核可／模擬執行會保存在同一個 SQLite。無須另啟 Node mock。
+一般 A+B ingest／verify／Case 工作流仍在 `/api/v1/*`，兩者資料分開；
+回放資料不是即時模型輸出。完整操作與端點見 `frontend/README.md`。
+
 ### 3. 本機環境變數
 
 在根目錄 `.env` 設定；變更後重啟後端。已 export 的 shell 環境變數會優先於 `.env`，

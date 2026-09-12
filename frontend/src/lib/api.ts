@@ -11,7 +11,7 @@ import type {
   TimelineItem,
   Trace,
   TraceSummary,
-  MockStatus,
+  ReplayStatus,
 } from "../types";
 
 export class ApiError extends Error {
@@ -48,36 +48,36 @@ function mutationHeaders(idempotencyKey: string): HeadersInit {
 }
 
 export const api = {
-  listCases: () => request<ListResponse<CaseSummary>>("/api/v1/cases"),
-  getCase: (caseId: string) => request<CaseSnapshot>(`/api/v1/cases/${caseId}`),
-  getTimeline: (caseId: string) => request<ListResponse<TimelineItem>>(`/api/v1/cases/${caseId}/timeline`),
-  getProducts: () => request<ListResponse<Product>>("/api/v1/products"),
-  getSignals: () => request<ListResponse<Signal>>("/api/v1/signals"),
-  getAgentStatus: (caseId: string) => request<AgentStatus>(`/api/v1/cases/${caseId}/agent-status`),
-  getApprovals: (caseId: string) => request<ListResponse<ApprovalRecord>>(`/api/v1/cases/${caseId}/approvals`),
-  getMockStatus: () => request<MockStatus>("/api/v1/mock/status"),
-  listTraces: () => request<ListResponse<TraceSummary>>("/api/v1/traces"),
-  getTrace: (traceId: string) => request<Trace>(`/api/v1/traces/${traceId}`),
+  listCases: () => request<ListResponse<CaseSummary>>("/api/v1/demo/cases"),
+  getCase: (caseId: string) => request<CaseSnapshot>(`/api/v1/demo/cases/${caseId}`),
+  getTimeline: (caseId: string) => request<ListResponse<TimelineItem>>(`/api/v1/demo/cases/${caseId}/timeline`),
+  getProducts: () => request<ListResponse<Product>>("/api/v1/demo/products"),
+  getSignals: () => request<ListResponse<Signal>>("/api/v1/demo/signals"),
+  getAgentStatus: (caseId: string) => request<AgentStatus>(`/api/v1/demo/cases/${caseId}/agent-status`),
+  getApprovals: (caseId: string) => request<ListResponse<ApprovalRecord>>(`/api/v1/demo/cases/${caseId}/approvals`),
+  getReplayStatus: () => request<ReplayStatus>("/api/v1/demo/status"),
+  listTraces: () => request<ListResponse<TraceSummary>>("/api/v1/demo/traces"),
+  getTrace: (traceId: string) => request<Trace>(`/api/v1/demo/traces/${traceId}`),
   createApproval: (caseId: string, body: { case_version: number; product_ids: string[]; approved_by?: string }) =>
-    request<ApprovalResponse>(`/api/v1/cases/${caseId}/approvals`, {
+    request<ApprovalResponse>(`/api/v1/demo/cases/${caseId}/approvals`, {
       method: "POST",
       headers: mutationHeaders(`approval-${caseId}-${body.case_version}-${body.product_ids.join("-")}-${Date.now()}`),
       body: JSON.stringify(body),
     }),
   executeApproval: (approvalId: string, idempotencyKey = `execute-${approvalId}-${Date.now()}`) =>
-    request<ExecutionResponse>(`/api/v1/approvals/${approvalId}/execute`, {
+    request<ExecutionResponse>(`/api/v1/demo/approvals/${approvalId}/execute`, {
       method: "POST",
       headers: mutationHeaders(idempotencyKey),
       body: JSON.stringify({}),
     }),
-  advanceCase: (caseId: string, reason = "Demo 以新證據示範案件版本更新") =>
-    request<{ case: CaseSnapshot; previous_version: number }>(`/api/v1/cases/${caseId}/advance`, {
+  advanceDemo: (expectedStage: number) =>
+    request<{ case: CaseSnapshot; previous_version: number; stage: number }>("/api/v1/demo/advance", {
       method: "POST",
-      headers: mutationHeaders(`advance-${caseId}-${Date.now()}`),
-      body: JSON.stringify({ reason }),
+      headers: mutationHeaders(`demo-advance-${expectedStage}-${Date.now()}`),
+      body: JSON.stringify({ expected_stage: expectedStage }),
     }),
-  resetMock: (stage: number, confirm = false, scenario = "main") =>
-    request<{ status: "reset"; mode: "mock"; stage: number; scenario: string; dataset_id: string }>("/api/v1/mock/reset", {
+  resetDemo: (stage: number, confirm = false, scenario = "main") =>
+    request<{ status: "reset"; mode: "backend_replay"; stage: number; scenario: string; dataset_id: string }>("/api/v1/demo/reset", {
       method: "POST",
       body: JSON.stringify({ stage, confirm, scenario }),
     }),

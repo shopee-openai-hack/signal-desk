@@ -315,7 +315,7 @@ export interface ListResponse<T> {
   next_cursor: string | null;
 }
 
-export interface MockProvenance {
+export interface ReplayProvenance {
   dataset_id: string;
   replay_window: string;
   source: string;
@@ -329,13 +329,13 @@ export interface MockProvenance {
   };
 }
 
-export interface MockStatus {
+export interface ReplayStatus {
   stage: number;
   default_stage: number;
   scenario: string;
-  mode: "mock" | string;
+  mode: "backend_replay";
   dataset_id: string;
-  provenance: MockProvenance;
+  provenance: ReplayProvenance;
   approvals: number;
   executions: number;
 }
