@@ -6,6 +6,25 @@ do not silently adapt either side: update this file in a small reviewable commit
 notify the owners of every affected workstream, then update producers before
 consumers.
 
+## Frontend read-model handoff — pending B review (2026-09-12)
+
+The frontend branch now has a local HTTP mock for four user-approved read needs:
+`GET /api/v1/signals`, `GET /api/v1/cases/{case_id}/agent-status`,
+`GET /api/v1/traces` and `GET /api/v1/traces/{trace_id}`, and
+`GET /api/v1/cases/{case_id}/approvals` (including execution results).
+These additions are proposals, not evidence that the production backend supports
+them or that B has accepted their exact shape. Existing canonical contracts below
+remain unchanged.
+
+See [frontend sync handoff](../frontend/SYNC_STATUS.md) for responsibilities and
+acceptance boundaries, [mock integration notes](../frontend/README.md) for current
+responses, and [rich Trace schema proposal](../frontend/TRACE_CONTRACT_PROPOSAL.md)
+for phase/activity snapshots, observable agent work, and retry history. The rich
+Trace producer and tests are available; the vertical UI consumer is still pending.
+B should confirm the read-model placement and shared models with A/C before
+production integration. Saved Trace playback must remain read-only and distinct
+from both live execution and the canonical case timeline.
+
 ## Ownership and change rules
 
 - B owns this contract and the shared Pydantic models. A and C review changes to

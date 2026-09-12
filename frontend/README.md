@@ -43,11 +43,14 @@ proxy 到 `http://localhost:8000`。目前 FastAPI 尚未提供案件工作流 e
 - **案件詳情** `/cases/:case_id/overview`：概覽、陳述、證據、未知事項、下一步與專員狀態。
 - **相關商品** `/cases/:case_id/products`：選取候選模擬商品，先核可，再明確執行；已核可商品若案件版本改變會被阻擋。
 - **案件時間軸** `/cases/:case_id/timeline`：查看不可覆寫的案件事件、版本、理由與來源。
-- **Trace 回放** `/trace`：播放保存的跨角色步驟，可暫停、前後跳步與跳回；人工核可步驟會暫停，播放不會觸發寫入。
+- **Trace 回放** `/trace`：播放清楚標示為 `saved_mock` 的唯讀情境；以垂直時間軸保留已播放階段，展開後可看 search／read／tool／handoff／retry／wait 活動、輸入輸出、來源證據、理由摘要與案件前後完整欄位。播放支援前後跳步、速度調整與人工核可停頓；目前／未來階段由本機回放游標逐步揭露，不會觸發寫入或付費呼叫。
 
 mock 內建兩個 trace：食用油主線，以及第一次失敗、第二次以相同 execution record
 重試成功的例外主線。`prod_oil_002` 會在第一次執行時失敗，重試會更新同一筆
-execution 的 `attempts`，不會製造第二筆成功操作。
+execution 的 `attempts`，不會製造第二筆成功操作。完整 phases／activities read
+model 與 producer／consumer 對照見
+[`TRACE_CONTRACT_PROPOSAL.md`](TRACE_CONTRACT_PROPOSAL.md)；既有 `steps` 欄位仍保留
+供舊版 Trace consumer 相容。
 
 ## Mock API 差異與整合缺口
 

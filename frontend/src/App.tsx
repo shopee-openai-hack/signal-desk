@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, CircleAlert, Clock3, ExternalLink, FileText, Inbox, Layers3, Loader2, Pause, Play, RotateCcw, ShieldAlert, Sparkles, UsersRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, CircleAlert, Clock3, FileText, Inbox, Layers3, Loader2, Play, RotateCcw, ShieldAlert, UsersRound } from "lucide-react";
 import { api } from "./lib/api";
 import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { TracePage } from "./pages/TracePage";
 import type { AgentStatus, ApprovalRecord, CaseSnapshot, CaseSummary, Product, ProductCandidate, Signal, TimelineItem } from "./types";
 
 type Page = "inbox" | "cases" | "case" | "trace";
@@ -39,6 +43,37 @@ function statusLabel(status: string) {
     completed: "已完成", ready: "待執行", succeeded: "成功", proposed: "待核可", approved: "已核可", rejected: "已拒絕",
   };
   return labels[status] ?? status;
+}
+
+function priorityLabel(priority: CaseSummary["priority"]) {
+  return { low: "低", medium: "中", high: "高", critical: "緊急" }[priority];
+}
+
+function claimKindLabel(kind: string) {
+  return { fact: "事實", experience: "經驗回報", hypothesis: "假設", request: "請求" }[kind] ?? "陳述";
+}
+
+function timelineKindLabel(kind: string) {
+  return {
+    signal_added: "收到訊號",
+    verification_updated: "查核更新",
+    assessment_updated: "判讀更新",
+    monitoring_updated: "追蹤更新",
+    approval_recorded: "完成核可",
+    action_executed: "執行處置",
+  }[kind] ?? "案件更新";
+}
+
+function missingInformationLabel(value: string) {
+  return { batch: "批次", seller_confirmation: "賣家確認" }[value] ?? "待補資訊";
+}
+
+function sourceLabel(value: string) {
+  return { saved_mock_observation: "已保存的 mock 觀測", backend: "後端觀測" }[value] ?? "觀測資料";
+}
+
+function actorLabel(type: string) {
+  return { case_agent: "案件專員", general_gatherer: "訊號整理員" }[type] ?? "系統角色";
 }
 
 function impactLabel(impact: CaseSummary["business_impact"]) {
@@ -92,18 +127,176 @@ function InboxPage({ signals, isLoading, isError, onRetry, onNavigate }: { signa
 }
 
 function AgentPanel({ agent, onAdvance, isAdvancing }: { agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean }) {
-  if (!agent) return <Panel className="p-5"><div className="flex items-center gap-2 text-sm font-semibold text-stone-800"><UsersRound className="size-4 text-stone-400" />專員狀態</div><p className="mt-3 text-sm text-stone-500">尚未提供可觀測的專員狀態。</p></Panel>;
-  return <Panel className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-sm font-semibold text-stone-800"><UsersRound className="size-4 text-orange-600" />案件專員狀態</div><p className="mt-1 text-xs text-stone-400">來源：{agent.source === "saved_mock_observation" ? "已保存 mock 觀測" : agent.source}</p></div><Pill tone={statusTone(agent.state)}>{statusLabel(agent.state)}</Pill></div><div className="mt-5 space-y-3 text-sm"><div><p className="text-xs text-stone-400">目前步驟</p><p className="mt-1 font-medium text-stone-800">{agent.current_step}</p></div><div><p className="text-xs text-stone-400">最近結果</p><p className="mt-1 leading-6 text-stone-700">{agent.latest_result}</p></div>{agent.waiting_reason && <div className="rounded-lg bg-orange-50 px-3 py-2.5 text-orange-900"><p className="text-xs font-semibold">等待原因</p><p className="mt-1 leading-5">{agent.waiting_reason}</p></div>}<div><p className="text-xs text-stone-400">下一步</p><p className="mt-1 text-stone-700">{agent.next_action ?? "尚未安排"}</p></div></div><div className="mt-5 border-t border-stone-100 pt-4"><button type="button" onClick={onAdvance} disabled={isAdvancing} className="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100 disabled:cursor-wait disabled:opacity-60"><RotateCcw className={`size-3.5 ${isAdvancing ? "animate-spin" : ""}`} />模擬收到新證據（mock）</button><p className="mt-2 text-xs leading-5 text-stone-400">這會將案件版本加一，示範舊核可被阻擋；不代表真實工作流已執行。</p></div></Panel>;
+  if (!agent) {
+    return (
+      <Panel className="p-5 shadow-none">
+        <div className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+          <UsersRound className="size-4 text-stone-400" />
+          專員狀態
+        </div>
+        <p className="mt-3 text-sm text-stone-500">尚未提供可觀測的專員狀態。</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel className="p-5 shadow-none">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+            <UsersRound className="size-4 text-stone-500" />
+            專員狀態
+          </div>
+          <p className="mt-1 text-xs text-stone-500">資料來源：{sourceLabel(agent.source)}</p>
+        </div>
+        <Pill tone={statusTone(agent.state)}>{statusLabel(agent.state)}</Pill>
+      </div>
+      <dl className="mt-5 space-y-4 text-sm">
+        <div>
+          <dt className="text-xs text-stone-500">目前步驟</dt>
+          <dd className="mt-1 font-medium leading-6 text-stone-800">{agent.current_step}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-stone-500">最近結果</dt>
+          <dd className="mt-1 leading-6 text-stone-700">{agent.latest_result}</dd>
+        </div>
+        {agent.waiting_reason && (
+          <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5 text-orange-900">
+            <dt className="text-xs font-semibold">等待原因</dt>
+            <dd className="mt-1 leading-5">{agent.waiting_reason}</dd>
+          </div>
+        )}
+        <div>
+          <dt className="text-xs text-stone-500">下一步</dt>
+          <dd className="mt-1 leading-6 text-stone-700">{agent.next_action ?? "尚未安排"}</dd>
+        </div>
+      </dl>
+      <div className="mt-5 border-t border-stone-100 pt-4">
+        <Button type="button" variant="outline" size="sm" onClick={onAdvance} disabled={isAdvancing} className="border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:text-orange-900">
+          <RotateCcw className={`size-3.5 ${isAdvancing ? "animate-spin" : ""}`} />
+          模擬收到新證據（mock）
+        </Button>
+        <p className="mt-2 text-xs leading-5 text-stone-500">案件版本會加一，舊核可將被阻擋。</p>
+      </div>
+    </Panel>
+  );
 }
 
 function OverviewTab({ current, signals, agent, onAdvance, isAdvancing }: { current: CaseSnapshot; signals: Signal[] | undefined; agent: AgentStatus | undefined; onAdvance: () => void; isAdvancing: boolean }) {
   const claims = signals?.flatMap((signal) => signal.claims.filter((claim) => current.claim_ids.includes(claim.claim_id))) ?? [];
-  return <div className="grid gap-5 xl:grid-cols-[1fr_340px]"><div className="space-y-5"><Panel className="p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Case assessment · v{current.version}</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{current.title}</h2></div><div className="flex flex-wrap gap-2"><Pill tone={statusTone(current.business_impact === "risk" ? "awaiting_approval" : current.business_impact)}>{impactLabel(current.business_impact)}</Pill><Pill tone={statusTone(current.status)}>{statusLabel(current.status)}</Pill><Pill tone={statusTone(current.priority)}>{current.priority} 優先</Pill></div></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><div className="rounded-xl bg-stone-50 p-4"><p className="text-xs text-stone-400">優先級理由</p><ul className="mt-2 space-y-2 text-sm leading-5 text-stone-700">{current.priority_reasons.map((item) => <li key={item} className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-orange-500" />{item}</li>)}</ul></div><div className="rounded-xl bg-stone-50 p-4"><p className="text-xs text-stone-400">追蹤計畫</p><p className="mt-2 text-sm font-medium text-stone-800">下次檢查：{formatDate(current.monitoring_plan.next_check_at)}</p><p className="mt-1 text-sm leading-5 text-stone-600">{current.monitoring_plan.reason}</p><div className="mt-3 flex flex-wrap gap-1.5">{current.monitoring_plan.targets.map((target) => <span key={target} className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600">{target}</span>)}</div></div></div></Panel><Panel className="p-6"><div className="flex items-center justify-between"><div><h3 className="font-semibold text-stone-900">陳述與查核</h3><p className="mt-1 text-sm text-stone-500">查核狀態與業務影響分開呈現。</p></div><Pill tone="neutral">{claims.length} 項陳述</Pill></div>{claims.length ? <div className="mt-5 space-y-3">{claims.map((claim) => <div key={claim.claim_id} className="rounded-xl border border-stone-200 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-medium text-stone-400">{claim.kind} · {claim.claim_id}</p><Pill tone={statusTone(claim.verification_status)}>{statusLabel(claim.verification_status)}</Pill></div><p className="mt-2 text-sm font-medium leading-6 text-stone-800">{claim.normalized_statement}</p><p className="mt-2 border-l-2 border-orange-200 pl-3 text-sm leading-6 text-stone-500">「{claim.quote}」</p>{claim.evidence.length > 0 && <div className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500"><span className="font-medium text-stone-700">證據：</span>{claim.evidence.map((item) => <span key={item.evidence_id} className="ml-2">{item.title}（{statusLabel(item.stance)}）</span>)}</div>}</div>)}</div> : <p className="mt-5 text-sm text-stone-500">尚未找到關聯陳述。</p>}</Panel><Panel className="p-6"><div className="grid gap-6 sm:grid-cols-2"><div><h3 className="font-semibold text-stone-900">尚未確認</h3><ul className="mt-3 space-y-2 text-sm leading-6 text-stone-600">{current.unknowns.map((item) => <li key={item} className="flex gap-2"><CircleAlert className="mt-1 size-4 shrink-0 text-orange-500" />{item}</li>)}</ul></div><div><h3 className="font-semibold text-stone-900">下一步</h3><ul className="mt-3 space-y-2 text-sm leading-6 text-stone-600">{current.next_steps.map((item) => <li key={item} className="flex gap-2"><ArrowRight className="mt-1 size-4 shrink-0 text-stone-400" />{item}</li>)}</ul></div></div></Panel></div><div className="space-y-5"><AgentPanel agent={agent} onAdvance={onAdvance} isAdvancing={isAdvancing} /><Panel className="p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">操作界線</p><p className="mt-3 text-sm leading-6 text-stone-600">候選商品不等於已證實受影響。只有本次選定、有效案件版本的模擬商品，才會進入核可與執行。</p></Panel></div></div>;
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-6">
+        <Panel className="p-6 shadow-none">
+          <h3 className="text-sm font-semibold text-stone-900">判讀摘要</h3>
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-stone-500">優先級理由</p>
+              <ul className="mt-2 space-y-2 text-sm leading-6 text-stone-700">
+                {current.priority_reasons.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-orange-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs text-stone-500">追蹤計畫</p>
+              <p className="mt-2 text-sm font-medium text-stone-800">下次檢查：{formatDate(current.monitoring_plan.next_check_at)}</p>
+              <p className="mt-1 text-sm leading-6 text-stone-600">{current.monitoring_plan.reason}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {current.monitoring_plan.targets.map((target) => (
+                  <span key={target} className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs text-stone-600">{target}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel className="p-6 shadow-none">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-semibold text-stone-900">陳述與查核</h3>
+            <Pill tone="neutral">{claims.length} 項陳述</Pill>
+          </div>
+          {claims.length ? (
+            <div className="mt-4 divide-y divide-stone-100">
+              {claims.map((claim) => (
+                <div key={claim.claim_id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-stone-500">{claimKindLabel(claim.kind)} · {claim.claim_id}</p>
+                    <Pill tone={statusTone(claim.verification_status)}>{statusLabel(claim.verification_status)}</Pill>
+                  </div>
+                  <p className="mt-2 text-sm font-medium leading-6 text-stone-800">{claim.normalized_statement}</p>
+                  <p className="mt-2 border-l-2 border-stone-200 pl-3 text-sm leading-6 text-stone-600">「{claim.quote}」</p>
+                  {claim.evidence.length > 0 && (
+                    <div className="mt-3 border-t border-stone-100 pt-3 text-xs leading-5 text-stone-600">
+                      <span className="font-medium text-stone-800">證據：</span>
+                      {claim.evidence.map((item) => <span key={item.evidence_id} className="ml-2">{item.title}（{statusLabel(item.stance)}）</span>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : <p className="mt-4 text-sm text-stone-500">尚未找到關聯陳述。</p>}
+        </Panel>
+
+        <Panel className="p-6 shadow-none">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div>
+              <h3 className="font-semibold text-stone-900">尚未確認</h3>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-600">
+                {current.unknowns.map((item) => <li key={item} className="flex gap-2"><CircleAlert className="mt-1 size-4 shrink-0 text-orange-600" />{item}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-stone-900">下一步</h3>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-600">
+                {current.next_steps.map((item) => <li key={item} className="flex gap-2"><ArrowRight className="mt-1 size-4 shrink-0 text-stone-500" />{item}</li>)}
+              </ul>
+            </div>
+          </div>
+        </Panel>
+      </div>
+      <div>
+        <AgentPanel agent={agent} onAdvance={onAdvance} isAdvancing={isAdvancing} />
+      </div>
+    </div>
+  );
 }
 
 function ProductRow({ candidate, product, selected, disabled, onToggle }: { candidate: ProductCandidate; product: Product | undefined; selected: boolean; disabled: boolean; onToggle: () => void }) {
   const excluded = candidate.relation === "excluded";
-  return <div className={`rounded-xl border p-4 ${excluded ? "border-stone-100 bg-stone-50/70" : selected ? "border-orange-300 bg-orange-50/40" : "border-stone-200"}`}><div className="flex items-start gap-3"><input type="checkbox" checked={selected} disabled={disabled || excluded || product?.status !== "active"} onChange={onToggle} aria-label={`選擇 ${product?.name ?? candidate.product_id}`} className="mt-1 size-4 accent-orange-600" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-stone-800">{product?.name ?? candidate.product_id}</p><p className="mt-1 text-xs text-stone-400">{product?.brand ?? "未知品牌"} · seller {product?.seller_id ?? "未知"}</p></div><div className="flex gap-2"><Pill tone={statusTone(candidate.relation)}>{statusLabel(candidate.relation)}</Pill>{product && <Pill tone={statusTone(product.status)}>{statusLabel(product.status)}</Pill>}</div></div><p className="mt-3 text-sm leading-5 text-stone-600">{candidate.reason}</p>{candidate.missing_information.length > 0 && <p className="mt-2 text-xs text-stone-400">缺失資訊：{candidate.missing_information.join("、")}</p>}{product?.failure_mode === "fail_once" && product.status === "active" && <p className="mt-2 text-xs font-medium text-orange-700">此模擬商品會在第一次執行時示範失敗，重試可觀察同一筆執行紀錄更新。</p>}</div></div></div>;
+  return (
+    <TableRow className={excluded ? "bg-stone-50/70" : selected ? "bg-orange-50/60" : undefined}>
+      <TableCell className="w-12 pr-0">
+        <input
+          type="checkbox"
+          role="checkbox"
+          checked={selected}
+          disabled={disabled || excluded || product?.status !== "active"}
+          onChange={onToggle}
+          aria-label={`選擇 ${product?.name ?? candidate.product_id}`}
+          className="size-4 accent-orange-600"
+        />
+      </TableCell>
+      <TableCell className="min-w-[220px]">
+        <p className="font-medium text-stone-800">{product?.name ?? candidate.product_id}</p>
+        <p className="mt-1 text-xs text-stone-500">{product?.brand ?? "未知品牌"} · 賣家 {product?.seller_id ?? "未知"}</p>
+      </TableCell>
+      <TableCell className="whitespace-nowrap">
+        <div className="flex flex-wrap gap-1.5">
+          <Pill tone={statusTone(candidate.relation)}>{statusLabel(candidate.relation)}</Pill>
+          {product && <Pill tone={statusTone(product.status)}>{statusLabel(product.status)}</Pill>}
+        </div>
+      </TableCell>
+      <TableCell className="min-w-[240px] max-w-[380px] text-stone-600">
+        <p className="leading-5">{candidate.reason}</p>
+        {candidate.missing_information.length > 0 && <p className="mt-1 text-xs text-stone-500">待補：{candidate.missing_information.map(missingInformationLabel).join("、")}</p>}
+        {product?.failure_mode === "fail_once" && product.status === "active" && <p className="mt-1 text-xs font-medium text-orange-700">首次執行會示範失敗，可重試同一筆紀錄。</p>}
+      </TableCell>
+    </TableRow>
+  );
 }
 
 function ProductsTab({ current, products, approvals, onInvalidate, queryError }: { current: CaseSnapshot; products: Product[] | undefined; approvals: ApprovalRecord[] | undefined; onInvalidate: () => void; queryError?: unknown }) {
@@ -114,12 +307,129 @@ function ProductsTab({ current, products, approvals, onInvalidate, queryError }:
   const productMap = new Map((products ?? []).map((product) => [product.product_id, product]));
   const toggle = (productId: string) => setSelected((items) => items.includes(productId) ? items.filter((item) => item !== productId) : [...items, productId]);
   const approvalStale = latestApproval && latestApproval.case_version !== current.version;
-  return <div className="space-y-5"><Panel className="p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Simulated products</p><h2 className="mt-2 text-xl font-semibold text-stone-900">相關商品與模擬下架</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">先選取，再建立人工核可，最後明確執行。候選、排除、已核可與實際結果分開保留。</p></div><Pill tone="orange">案件 v{current.version}</Pill></div>{queryError !== undefined && queryError !== null && <div className="mt-5"><ErrorNotice error={queryError} /></div>}<div className="mt-6 space-y-3">{current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || Boolean(approvalStale)} onToggle={() => toggle(candidate.product_id)} />)}</div><div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-5"><p className="text-sm text-stone-500">已選 {selected.length} 項 · 新增商品不會沿用舊核可</p><button type="button" disabled={selected.length === 0 || createApproval.isPending || Boolean(approvalStale)} onClick={() => createApproval.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-45"><Check className="size-4" />{createApproval.isPending ? "建立核可中…" : "確認核可選取商品"}</button></div>{createApproval.error && <div className="mt-4"><ErrorNotice error={createApproval.error} /></div>}</Panel>{latestApproval && <Panel className="p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">Approval record</p><h3 className="mt-2 font-semibold text-stone-900">最近一次核可</h3><p className="mt-1 text-sm text-stone-500">{latestApproval.approval_id} · 案件 v{latestApproval.case_version} · {formatDate(latestApproval.approved_at)}</p></div><Pill tone={approvalStale ? "red" : "green"}>{approvalStale ? "版本已失效" : statusLabel(latestApproval.status)}</Pill></div>{approvalStale && <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm leading-6 text-red-800"><CircleAlert className="mt-1 size-4 shrink-0" />案件已更新，這筆核可不能執行；請依目前 v{current.version} 重新選取與核可。</div>}<div className="mt-5 grid gap-3 sm:grid-cols-2">{latestApproval.executions.map((execution) => { const product = productMap.get(execution.product_id); return <div key={execution.execution_id} className="rounded-xl border border-stone-200 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-stone-800">{product?.name ?? execution.product_id}</p><p className="mt-1 text-xs text-stone-400">attempt {execution.attempts} · {execution.execution_id}</p></div><Pill tone={statusTone(execution.status)}>{statusLabel(execution.status)}</Pill></div>{execution.error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">{execution.error}</p>}{execution.status !== "succeeded" && !approvalStale && <button type="button" onClick={() => execute.mutate(latestApproval.approval_id)} disabled={execute.isPending} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-orange-200 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"><RotateCcw className="size-3.5" />{execute.isPending ? "重試中…" : "重試這筆執行"}</button>}</div>; })}</div><div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-5"><p className="text-xs leading-5 text-stone-400">核可與執行紀錄會保存在 mock state；重新整理仍可查看。</p><button type="button" onClick={() => execute.mutate(latestApproval.approval_id)} className="inline-flex items-center gap-2 rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:border-orange-300 hover:text-orange-800 disabled:cursor-not-allowed disabled:opacity-45">{execute.isPending ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}明確執行模擬下架</button></div>{execute.error && <div className="mt-4"><ErrorNotice error={execute.error} /></div>}</Panel>}{!latestApproval && <Panel className="p-6"><div className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Clock3 className="size-4 text-orange-600" />尚未建立核可</div><p className="mt-2 text-sm leading-6 text-stone-500">選取候選商品後，核可紀錄會出現在這裡；核可本身不會直接執行下架。</p></Panel>}</div>;
+  return (
+    <div className="space-y-6">
+      <Panel className="p-6 shadow-none">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-stone-900">相關商品</h3>
+            <p className="mt-1 text-sm text-stone-500">選取商品後建立核可，再明確執行模擬下架。</p>
+          </div>
+          <Pill tone="neutral">案件 v{current.version}</Pill>
+        </div>
+        {queryError !== undefined && queryError !== null && <div className="mt-5"><ErrorNotice error={queryError} /></div>}
+        <div className="mt-5 overflow-hidden rounded-md border border-stone-200">
+          <Table>
+            <caption className="sr-only">案件相關商品與模擬處置狀態</caption>
+            <TableHeader>
+              <TableRow className="bg-stone-50 hover:bg-stone-50">
+                <TableHead className="w-12 pr-0"><span className="sr-only">選取</span></TableHead>
+                <TableHead>商品</TableHead>
+                <TableHead>關聯與狀態</TableHead>
+                <TableHead>關聯依據</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || Boolean(approvalStale)} onToggle={() => toggle(candidate.product_id)} />)}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-5">
+          <p className="text-sm text-stone-500">已選 {selected.length} 項 · 新增商品不會沿用舊核可</p>
+          <Button type="button" disabled={selected.length === 0 || createApproval.isPending || Boolean(approvalStale)} onClick={() => createApproval.mutate()}>
+            <Check className="size-4" />
+            {createApproval.isPending ? "建立核可中…" : "確認核可選取商品"}
+          </Button>
+        </div>
+        {createApproval.error && <div className="mt-4"><ErrorNotice error={createApproval.error} /></div>}
+      </Panel>
+
+      {latestApproval ? (
+        <Panel className="p-6 shadow-none">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-stone-900">最近一次核可</h3>
+              <p className="mt-1 text-sm text-stone-500">案件 v{latestApproval.case_version} · {formatDate(latestApproval.approved_at)}</p>
+            </div>
+            <Pill tone={approvalStale ? "red" : "green"}>{approvalStale ? "版本已失效" : statusLabel(latestApproval.status)}</Pill>
+          </div>
+          {approvalStale && <div className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-3 text-sm leading-6 text-red-800"><CircleAlert className="mt-1 size-4 shrink-0" />案件已更新，這筆核可不能執行；請依目前 v{current.version} 重新選取與核可。</div>}
+          <div className="mt-4 divide-y divide-stone-100 border-y border-stone-100">
+            {latestApproval.executions.map((execution) => {
+              const product = productMap.get(execution.product_id);
+              return (
+                <div key={execution.execution_id} className="flex flex-wrap items-start justify-between gap-3 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-stone-800">{product?.name ?? execution.product_id}</p>
+                    <p className="mt-1 text-xs text-stone-500">第 {execution.attempts} 次嘗試</p>
+                    {execution.error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">{execution.error}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <Pill tone={statusTone(execution.status)}>{statusLabel(execution.status)}</Pill>
+                    {execution.status !== "succeeded" && !approvalStale && <Button type="button" variant="outline" size="sm" onClick={() => execute.mutate(latestApproval.approval_id)} disabled={execute.isPending}><RotateCcw className="size-3.5" />{execute.isPending ? "重試中…" : "重試"}</Button>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-stone-500">執行結果會保留在案件紀錄中。</p>
+            <Button type="button" variant="outline" onClick={() => execute.mutate(latestApproval.approval_id)} disabled={Boolean(approvalStale) || execute.isPending}>
+              {execute.isPending ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
+              明確執行模擬下架
+            </Button>
+          </div>
+          {execute.error && <div className="mt-4"><ErrorNotice error={execute.error} /></div>}
+        </Panel>
+      ) : (
+        <Panel className="p-5 shadow-none">
+          <div className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Clock3 className="size-4 text-stone-500" />尚未建立核可</div>
+          <p className="mt-2 text-sm leading-6 text-stone-500">選取候選商品後，核可紀錄會出現在這裡。</p>
+        </Panel>
+      )}
+    </div>
+  );
 }
 
 function TimelineTab({ timeline }: { timeline: TimelineItem[] | undefined }) {
   if (!timeline?.length) return <EmptyState title="尚無時間軸紀錄" message="案件的來源、查核與操作會在這裡保留。" />;
-  return <Panel className="p-6"><div className="flex items-center justify-between"><div><h2 className="text-xl font-semibold text-stone-900">案件時間軸</h2><p className="mt-1 text-sm text-stone-500">保存當時的案件版本與證據支持摘要。</p></div><Pill tone="neutral">{timeline.length} 個事件</Pill></div><ol className="mt-7 space-y-0">{timeline.map((item, index) => <li key={item.timeline_id} className="relative flex gap-4 pb-7 last:pb-0"><div className="flex flex-col items-center"><div className={`z-[1] flex size-8 items-center justify-center rounded-full border-4 border-white ${index === timeline.length - 1 ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-700"}`}><span className="size-1.5 rounded-full bg-current" /></div>{index < timeline.length - 1 && <div className="h-full w-px bg-stone-200" />}</div><div className="min-w-0 flex-1 rounded-xl border border-stone-200 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Pill tone="neutral">v{item.case_version}</Pill><span className="text-xs font-medium text-stone-500">{item.kind}</span></div><time className="text-xs text-stone-400">{formatDate(item.occurred_at)}</time></div><p className="mt-3 text-sm font-medium leading-6 text-stone-800">{item.summary}</p><p className="mt-2 text-sm leading-6 text-stone-500">{item.reason}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-stone-100 pt-3 text-xs text-stone-400"><span>角色：{item.actor.id}</span>{item.source_refs.length > 0 && <span>來源：{item.source_refs.join("、")}</span>}</div></div></li>)}</ol></Panel>;
+  return (
+    <Panel className="overflow-hidden p-0 shadow-none">
+      <div className="flex items-center justify-between gap-3 px-6 pb-4 pt-6">
+        <h3 className="font-semibold text-stone-900">案件時間軸</h3>
+        <Pill tone="neutral">{timeline.length} 個事件</Pill>
+      </div>
+      <ol>
+        {timeline.map((item, index) => (
+          <li key={item.timeline_id} className="border-t border-stone-100 px-6 py-5">
+            <div className="flex gap-4">
+              <div className="relative flex w-8 shrink-0 justify-center">
+                {index < timeline.length - 1 && <span aria-hidden="true" className="absolute bottom-[-1.25rem] top-8 w-px bg-stone-200" />}
+                <span className={`z-[1] mt-0.5 flex size-7 items-center justify-center rounded-full ${index === timeline.length - 1 ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-700"}`}>
+                  <span className="size-1.5 rounded-full bg-current" />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Pill tone="neutral">v{item.case_version}</Pill>
+                    <span className="text-xs font-medium text-stone-600">{timelineKindLabel(item.kind)}</span>
+                  </div>
+                  <time className="text-xs text-stone-500">{formatDate(item.occurred_at)}</time>
+                </div>
+                <p className="mt-3 text-sm font-medium leading-6 text-stone-800">{item.summary}</p>
+                <p className="mt-1 text-sm leading-6 text-stone-600">{item.reason}</p>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-stone-100 pt-3 text-xs text-stone-500">
+                  <span>角色：{actorLabel(item.actor.type)}</span>
+                  {item.source_refs.length > 0 && <span>來源：{item.source_refs.join("、")}</span>}
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </Panel>
+  );
 }
 
 function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProductsLoading, isProductsError, onRetryProducts }: { caseId: string; tab: CaseTab; onNavigate: (path: string) => void; signals: Signal[] | undefined; products: Product[] | undefined; isProductsLoading: boolean; isProductsError: boolean; onRetryProducts: () => void }) {
@@ -133,23 +443,35 @@ function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProducts
   if (current.isLoading) return <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入案件…</div>;
   if (current.isError || !current.data) return <ErrorNotice error={current.error ?? new Error("案件不存在。")} onRetry={() => current.refetch()} />;
   const snapshot = current.data;
-  return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1" role="tablist" aria-label="案件詳情分頁">{(["overview", "products", "timeline"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => switchTab(item)} className={`rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? "bg-stone-900 text-white" : "text-stone-500 hover:text-stone-900"}`}>{item === "overview" ? "案件概覽" : item === "products" ? "相關商品" : "案件時間軸"}</button>)}</div><div className="flex items-center gap-2"><Pill tone="neutral">{snapshot.case_id}</Pill><a href={`https://example.test/cases/${snapshot.case_id}`} target="_blank" rel="noreferrer" className="hidden items-center gap-1 text-xs text-stone-400 hover:text-orange-700 sm:flex">來源連結<ExternalLink className="size-3" /></a></div></div>{advance.error && <ErrorNotice error={advance.error} />}{tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} />}{tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); }} queryError={approvals.error} />}</>}{tab === "timeline" && (timeline.isLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入時間軸…</div> : timeline.isError ? <ErrorNotice error={timeline.error} onRetry={() => timeline.refetch()} /> : <TimelineTab timeline={timeline.data?.items} />)}</div>;
-}
+  return (
+    <Tabs value={tab} onValueChange={(value) => switchTab(value as CaseTab)} className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold tracking-tight text-stone-900">{snapshot.title}</h2>
+            <Pill tone="neutral">v{snapshot.version}</Pill>
+          </div>
+          <p className="mt-1 text-sm text-stone-500">{snapshot.case_id} · 更新於 {formatDate(snapshot.updated_at)}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Pill tone={statusTone(snapshot.business_impact === "risk" ? "awaiting_approval" : snapshot.business_impact)}>{impactLabel(snapshot.business_impact)}</Pill>
+          <Pill tone={statusTone(snapshot.status)}>{statusLabel(snapshot.status)}</Pill>
+          <Pill tone={statusTone(snapshot.priority)}>{priorityLabel(snapshot.priority)}優先</Pill>
+        </div>
+      </div>
 
-function TracePage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const traces = useQuery({ queryKey: ["traces"], queryFn: api.listTraces });
-  const [traceId, setTraceId] = useState<string | undefined>();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const selectedId = traceId ?? traces.data?.items[0]?.trace_id;
-  const trace = useQuery({ queryKey: ["trace", selectedId], queryFn: () => api.getTrace(selectedId as string), enabled: Boolean(selectedId) });
-  useEffect(() => { setStepIndex(0); setPlaying(false); }, [selectedId]);
-  const currentStep = trace.data?.steps[stepIndex];
-  useEffect(() => { if (!playing || !trace.data) return; const timer = window.setInterval(() => setStepIndex((index) => { if (index >= trace.data.steps.length - 1) { setPlaying(false); return index; } return index + 1; }), 2600); return () => window.clearInterval(timer); }, [playing, trace.data]);
-  useEffect(() => { if (currentStep?.status === "waiting_human") setPlaying(false); }, [currentStep]);
-  if (traces.isLoading) return <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入回放…</div>;
-  if (traces.isError) return <ErrorNotice error={traces.error} onRetry={() => traces.refetch()} />;
-  return <div className="space-y-5"><div className="grid gap-4 xl:grid-cols-[280px_1fr]"><Panel className="h-fit p-4"><div className="flex items-center gap-2 px-2"><Sparkles className="size-4 text-orange-600" /><h2 className="font-semibold text-stone-900">保存的情境</h2></div><p className="px-2 pb-3 pt-2 text-xs leading-5 text-stone-500">播放只讀取保存快照，不會建立核可、執行或呼叫 API。</p><div className="space-y-2">{traces.data?.items.map((item) => <button type="button" key={item.trace_id} onClick={() => setTraceId(item.trace_id)} className={`w-full rounded-xl border p-3 text-left ${selectedId === item.trace_id ? "border-orange-300 bg-orange-50" : "border-stone-200 hover:border-orange-200"}`}><div className="flex items-start justify-between gap-2"><span className="text-sm font-medium leading-5 text-stone-800">{item.name}</span><ChevronRight className="mt-0.5 size-4 shrink-0 text-stone-300" /></div><p className="mt-2 text-xs leading-5 text-stone-500">{item.description}</p><div className="mt-3 flex items-center justify-between text-[11px] text-stone-400"><span>{item.mode === "saved_mock" ? "已保存 mock" : item.mode}</span><span>{item.case_id}</span></div></button>)}</div></Panel><Panel className="min-h-[560px] p-6">{trace.isLoading && <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入情境…</div>}{trace.isError && <ErrorNotice error={trace.error} />}{trace.data && currentStep && <div><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Saved trace · read only</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{trace.data.name}</h2><p className="mt-2 text-sm text-stone-500">{trace.data.description}</p></div><Pill tone="orange">第 {stepIndex + 1} / {trace.data.steps.length} 步</Pill></div><div className="mt-7 flex gap-1.5">{trace.data.steps.map((step, index) => <button type="button" aria-label={`跳到第 ${index + 1} 步`} key={step.step_id} onClick={() => { setStepIndex(index); setPlaying(false); }} className={`h-1.5 flex-1 rounded-full ${index <= stepIndex ? "bg-orange-500" : "bg-stone-200"}`} />)}</div><div className="mt-8 rounded-2xl border border-orange-200 bg-orange-50/60 p-6"><div className="flex flex-wrap items-center gap-2"><Pill tone="orange">{currentStep.kind}</Pill><Pill tone={statusTone(currentStep.status)}>{statusLabel(currentStep.status)}</Pill><span className="text-xs text-stone-500">負責角色：{currentStep.actor.id}</span></div><h3 className="mt-4 text-xl font-semibold text-stone-900">{currentStep.title}</h3><p className="mt-3 text-base leading-7 text-stone-800">{currentStep.summary}</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-orange-100 bg-white/80 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-stone-400">為什麼</p><p className="mt-2 text-sm leading-6 text-stone-700">{currentStep.reason}</p></div><div className="rounded-xl border border-orange-100 bg-white/80 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-stone-400">案件前後</p><p className="mt-2 text-sm text-stone-700">v{currentStep.case_before.version} · {statusLabel(currentStep.case_before.status)} <ArrowRight className="mx-1 inline size-3.5 text-orange-500" /> v{currentStep.case_after.version} · {statusLabel(currentStep.case_after.status)}</p></div></div>{currentStep.status === "waiting_human" && <div className="mt-5 flex items-start gap-2 rounded-xl border border-orange-300 bg-white px-3 py-3 text-sm leading-6 text-orange-900"><UsersRound className="mt-1 size-4 shrink-0" />回放在人工核可點暫停；繼續播放只展示已保存紀錄，不產生新的操作。</div>}</div><div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2"><button type="button" onClick={() => { setStepIndex((index) => Math.max(index - 1, 0)); setPlaying(false); }} disabled={stepIndex === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 hover:border-orange-300 disabled:opacity-40"><ArrowLeft className="size-4" />上一步</button><button type="button" onClick={() => setPlaying((value) => !value)} disabled={stepIndex === trace.data.steps.length - 1} className="inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-3 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-40">{playing ? <Pause className="size-4" /> : <Play className="size-4" />}{playing ? "暫停" : "播放"}</button><button type="button" onClick={() => { setStepIndex((index) => Math.min(index + 1, trace.data!.steps.length - 1)); setPlaying(false); }} disabled={stepIndex === trace.data.steps.length - 1} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 hover:border-orange-300 disabled:opacity-40">下一步<ArrowRight className="size-4" /></button></div><button type="button" onClick={() => onNavigate(`/cases/${trace.data!.case_id}/timeline`)} className="text-sm font-medium text-orange-800 hover:underline">查看案件時間軸 <ArrowRight className="inline size-3.5" /></button></div><details className="mt-7 rounded-xl border border-stone-200"><summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-600">查看技術細節（唯讀）</summary><div className="grid gap-3 border-t border-stone-100 px-4 py-4 text-xs text-stone-500 sm:grid-cols-2"><p>step_id：{currentStep.step_id}</p><p>input_refs：{currentStep.input_refs.join(", ") || "無"}</p><p>actor_type：{currentStep.actor.type}</p><p>snapshot：case v{currentStep.case_after.version}</p></div></details></div>}</Panel></div></div>;
+      <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-0 border-b bg-transparent p-0">
+        <TabsTrigger value="overview" className="h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 text-stone-500 shadow-none hover:bg-transparent hover:text-stone-900 data-[state=active]:border-stone-900 data-[state=active]:bg-transparent data-[state=active]:text-stone-900 data-[state=active]:shadow-none">案件概覽</TabsTrigger>
+        <TabsTrigger value="products" className="h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 text-stone-500 shadow-none hover:bg-transparent hover:text-stone-900 data-[state=active]:border-stone-900 data-[state=active]:bg-transparent data-[state=active]:text-stone-900 data-[state=active]:shadow-none">相關商品</TabsTrigger>
+        <TabsTrigger value="timeline" className="h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 text-stone-500 shadow-none hover:bg-transparent hover:text-stone-900 data-[state=active]:border-stone-900 data-[state=active]:bg-transparent data-[state=active]:text-stone-900 data-[state=active]:shadow-none">案件時間軸</TabsTrigger>
+      </TabsList>
+
+      {advance.error && <ErrorNotice error={advance.error} />}
+      {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} />}
+      {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); }} queryError={approvals.error} />}</>}
+      {tab === "timeline" && (timeline.isLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入時間軸…</div> : timeline.isError ? <ErrorNotice error={timeline.error} onRetry={() => timeline.refetch()} /> : <TimelineTab timeline={timeline.data?.items} />)}
+    </Tabs>
+  );
 }
 
 export default function App() {
@@ -160,5 +482,5 @@ export default function App() {
   const signals = useQuery({ queryKey: ["signals"], queryFn: api.getSignals, enabled: route.page === "inbox" || route.page === "case" });
   const products = useQuery({ queryKey: ["products"], queryFn: api.getProducts, enabled: route.page === "case" });
   const selectedCase = route.page === "case" ? route.caseId : undefined;
-  return <div className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} /><div className="lg:pl-[248px]"><Header route={route} onNavigate={navigate} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} />}</main></div></div>;
+  return <div className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} /><div className="lg:pl-[248px]"><Header route={route} onNavigate={navigate} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} />}</main></div></div>;
 }

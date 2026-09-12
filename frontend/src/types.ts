@@ -164,16 +164,149 @@ export interface TraceStep {
   case_after: { version: number; status: string };
 }
 
+/**
+ * A scalar field shown in a saved trace. Values are deliberately small and
+ * serialisable so a replay can explain an observed input or output without
+ * exposing provider prompts, private chain of thought, or secrets.
+ */
+export type TraceScalar = string | number | boolean | null;
+
+export interface TraceField {
+  key: string;
+  label: string;
+  value: TraceScalar;
+  ref?: string | null;
+}
+
+export interface TraceEvidenceRef {
+  evidence_id: string;
+  label: string;
+  url?: string | null;
+  excerpt?: string | null;
+  stance?: "supports" | "refutes" | "context_only" | null;
+}
+
+export interface TraceClaimSnapshot {
+  claim_id: string;
+  verification_status: Claim["verification_status"];
+  statement: string;
+  evidence_refs: string[];
+}
+
+export interface TraceCandidateSnapshot {
+  product_id: string;
+  relation: ProductRelation;
+  reason: string;
+  missing_information: string[];
+  product_status: ProductStatus | null;
+}
+
+/** Full business fields captured before and after a phase, not only a version. */
+export interface TraceCaseSnapshot {
+  case_id: string;
+  title: string;
+  version: number;
+  status: CaseStatus | string;
+  business_impact: BusinessImpact;
+  priority: Priority;
+  owner: Owner;
+  claim_ids: string[];
+  claims: TraceClaimSnapshot[];
+  candidate_products: TraceCandidateSnapshot[];
+  unknowns: string[];
+  next_steps: string[];
+}
+
+export type TraceActivityKind = "search" | "read" | "tool" | "handoff" | "retry" | "decision" | "wait";
+export type TraceActivityStatus = "completed" | "failed" | "waiting" | "succeeded";
+
+export interface TraceActivity {
+  activity_id: string;
+  sequence: number;
+  kind: TraceActivityKind | string;
+  title: string;
+  summary: string;
+  reason: string;
+  actor: Owner;
+  status: TraceActivityStatus;
+  occurred_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  input: TraceField[];
+  output: TraceField[];
+  source_refs: string[];
+  evidence: TraceEvidenceRef[];
+  retry_of_activity_id: string | null;
+  attempt: number;
+  error: string | null;
+}
+
+export type TracePhaseStatus = "completed" | "waiting_human" | "ready" | "failed" | "succeeded";
+
+export interface TracePointer {
+  id: string;
+  title: string;
+  sequence: number;
+}
+
+export interface TracePhaseProgress {
+  completed_activities: number;
+  total_activities: number;
+}
+
+export interface TracePhase {
+  phase_id: string;
+  sequence: number;
+  kind: string;
+  title: string;
+  summary: string;
+  reason: string;
+  actor: Owner;
+  status: TracePhaseStatus;
+  occurred_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  progress: TracePhaseProgress;
+  input: TraceField[];
+  output: TraceField[];
+  source_refs: string[];
+  evidence: TraceEvidenceRef[];
+  activities: TraceActivity[];
+  case_before: TraceCaseSnapshot;
+  case_after: TraceCaseSnapshot;
+  /** Recorded next action from the source run; replay cursors are client state. */
+  next_activity: TracePointer | null;
+  next_phase: TracePointer | null;
+  pause_reason: string | null;
+}
+
+export interface TraceReplay {
+  strategy: "ordered_phases";
+  default_speed: number;
+  speed_options: number[];
+  pause_on_human: boolean;
+  read_only: true;
+  cursor_semantics: "client_revealed";
+}
+
 export interface TraceSummary {
   trace_id: string;
   name: string;
   description: string;
   mode: "saved_mock" | "backend" | string;
   case_id: string;
+  trace_status?: "saved" | "completed" | "failed" | string;
+  scenario?: "main" | "failure_retry" | string;
+  recorded_at?: string;
+  phase_count?: number;
+  activity_count?: number;
+  contains_human_pause?: boolean;
 }
 
 export interface Trace extends TraceSummary {
   steps: TraceStep[];
+  replay?: TraceReplay;
+  phases?: TracePhase[];
 }
 
 export interface ListResponse<T> {
