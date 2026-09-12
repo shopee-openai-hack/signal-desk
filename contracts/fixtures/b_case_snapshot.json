@@ -1,0 +1,58 @@
+{
+  "case_id": "case_001",
+  "version": 1,
+  "title": "泰山沙拉油疑似通路收回",
+  "status": "monitoring",
+  "business_impact": "pending",
+  "priority": "medium",
+  "priority_reasons": [
+    "潛在消費者健康風險",
+    "品牌與在售商品吻合",
+    "來源單一且二手"
+  ],
+  "owner": {
+    "type": "case_agent",
+    "id": "agent_food_safety"
+  },
+  "claim_ids": [
+    "clm_s1_hypothesis_recall",
+    "clm_s1_experience_smell",
+    "clm_s1_request_peers"
+  ],
+  "unknowns": [
+    "受影響批號尚未確認",
+    "尚無官方公告或獨立來源證實通路收回"
+  ],
+  "next_steps": [
+    "等待獨立來源或官方公告",
+    "追蹤候選商品的批號資訊"
+  ],
+  "monitoring_plan": {
+    "targets": [
+      "泰山沙拉油",
+      "食品安全官方公告"
+    ],
+    "next_check_at": "2026-07-01T05:20:00Z",
+    "reason": "單一二手訊號需要持續追蹤，尚不足以確認商品風險"
+  },
+  "candidate_products": [
+    {
+      "product_id": "prod_001",
+      "relation": "candidate",
+      "reason": "品牌吻合，事件的受影響批號未知",
+      "missing_information": [
+        "affected_batch"
+      ]
+    },
+    {
+      "product_id": "prod_002",
+      "relation": "candidate",
+      "reason": "品牌吻合，商品批號與事件的受影響批號均未知",
+      "missing_information": [
+        "batch",
+        "affected_batch"
+      ]
+    }
+  ],
+  "updated_at": "2026-06-30T05:20:00Z"
+}

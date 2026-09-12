@@ -703,6 +703,16 @@ class SQLiteSignalStore:
             ).fetchone()
             return self._get_signal(connection, signal_id) if row else None
 
+    def list_signals(self, limit: int = 50) -> list[Signal]:
+        """Read persisted Signals with their latest canonical Claim views."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT signal_id FROM signals "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [self._get_signal(connection, row["signal_id"]) for row in rows]
+
     def get_claim(self, claim_id: str) -> Claim | None:
         with self.connect() as connection:
             return self._get_claim(connection, claim_id)
