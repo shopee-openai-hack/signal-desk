@@ -1,0 +1,70 @@
+{
+  "items": [
+    {
+      "stage": 1,
+      "provider": "threads",
+      "source_id": "post_001",
+      "url": "https://example.test/post/001",
+      "author_ref": "user_001",
+      "published_at": "2026-06-30T05:20:00Z",
+      "raw_text": "朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來，不知道發生什麼事。我家上週剛買一桶，味道好像有點怪，有人也遇到嗎？",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 2,
+      "provider": "threads",
+      "source_id": "post_002",
+      "url": "https://example.test/post/002",
+      "author_ref": "user_002",
+      "published_at": "2026-06-30T10:05:00Z",
+      "raw_text": "轉貼：朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來……有人也遇到嗎？",
+      "source_relation": "repost",
+      "duplicate_of_source_id": "post_001"
+    },
+    {
+      "stage": 3,
+      "provider": "threads",
+      "source_id": "post_003",
+      "url": "https://example.test/post/003",
+      "author_ref": "user_003",
+      "published_at": "2026-07-01T01:40:00Z",
+      "raw_text": "我在蝦皮買的福壽大豆沙拉油，瓶身標示原料批號 315-1150404。今天看到說中聯油脂的大豆油驗出苯駢芘超標，福壽是不是也用中聯的油？已經開了兩瓶，很擔心。",
+      "source_relation": "independent_report",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 4,
+      "provider": "fda_tw",
+      "source_id": "fda_20260701",
+      "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379",
+      "author_ref": null,
+      "published_at": "2026-07-01T08:00:00Z",
+      "raw_text": "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0；流向福懋 588 公噸、福壽 421 公噸、泰山 291 公噸；首波 15 項油品下架。",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 5,
+      "provider": "fda_tw",
+      "source_id": "fda_20260707",
+      "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634443",
+      "author_ref": null,
+      "published_at": "2026-07-07T09:00:00Z",
+      "raw_text": "擴大為所有使用受影響原料製成之食品，不論比例，7/8 24 時前全面下架。前一日 7/6 公告已擴為 360 家、18 項產品、30 批號。",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    },
+    {
+      "stage": 6,
+      "provider": "news",
+      "source_id": "cna_20260723",
+      "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
+      "author_ref": null,
+      "published_at": "2026-07-23T09:04:00Z",
+      "raw_text": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品由泰山、福懋及福壽製成共 501 項產品，可重新上架。",
+      "source_relation": "original",
+      "duplicate_of_source_id": null
+    }
+  ]
+}

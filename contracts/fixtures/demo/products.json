@@ -1,0 +1,14 @@
+{
+  "items": [
+    {"product_id":"prod_001","name":"大豆沙拉油 1.5L","brand":"泰山","batch":"315-1150404","seller_id":"seller_sim_001","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_002","name":"大豆沙拉油 3L","brand":"泰山","batch":null,"seller_id":"seller_sim_002","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_003","name":"大豆沙拉油 2L","brand":"福壽","batch":"315-1150404","seller_id":"seller_sim_003","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_004","name":"大豆沙拉油 2L","brand":"福壽","batch":"315-1150398","seller_id":"seller_sim_003","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_005","name":"大豆沙拉油 18L 業務用","brand":"福懋","batch":"315-1150404","seller_id":"seller_sim_004","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_006","name":"花生油 1L","brand":"泰山","batch":null,"seller_id":"seller_sim_001","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_007","name":"沙茶醬 250g，宣告使用福壽沙拉油","brand":"示範食品（模擬品牌）","batch":"315-1150404","seller_id":"seller_sim_005","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_008","name":"葵花油 1L","brand":"得意的一天（無關品牌）","batch":null,"seller_id":"seller_sim_006","status":"active","version":1,"is_simulated":true},
+    {"product_id":"prod_009","name":"大豆沙拉油 2L","brand":"福壽","batch":"315-1150411","seller_id":"seller_sim_003","status":"active","version":1,"is_simulated":true}
+  ],
+  "next_cursor": null
+}
