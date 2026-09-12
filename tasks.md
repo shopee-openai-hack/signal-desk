@@ -22,6 +22,10 @@ Every subagent must first read, in order:
 6. `issues/01-signal-verification.md`
 7. `issues/01a-synthesized-data-handoff.md`
 
+All Python commands run through the repo-local environment created by A0.0. Use
+`.venv/bin/python` and `.venv/bin/uv`; do not depend on a globally installed `uv` or
+install project packages into the system Python.
+
 Shared constraints for every task:
 
 - Preserve the existing FastAPI/Pydantic/httpx/OpenAI SDK/SQLite stack.
@@ -56,10 +60,53 @@ No task below requires a new answer from A, B, D or the user before it starts:
 
 Assignment order:
 
+- Bootstrap: A0.0. It may run while A0/A1 code is being written, but it must finish
+  before their verification commands run.
 - Wave 1, parallel: A0 and A1.
 - Wave 2, parallel after its listed prerequisites: A2, A3, A4 and A6.
 - Wave 3: A5.
 - Wave 4: A7.
+
+## Task A0.0 — repo-local Python environment
+
+### Goal
+
+Create one repeatable repo-local Python environment in `.venv` containing `uv`, the
+locked application dependencies, the OpenAI SDK and test dependencies. Do not read or
+modify secrets.
+
+### Owned file
+
+```text
+scripts/bootstrap_venv.sh
+uv.toml
+```
+
+The generated `.venv/` is ignored local state, not a committed artifact.
+
+### Work
+
+- Require an available Python version matching `pyproject.toml` (`>=3.12,<3.14`).
+- Create or safely reuse `.venv` with standard-library `python -m venv`.
+- Install `uv` into that same `.venv`, then run the frozen development sync into the
+  active `.venv`; do not create a second environment.
+- Keep uv's cache under `.venv/.uv-cache` through the committed `uv.toml`, so all
+  standard `.venv/bin/uv ...` commands remain repo-local.
+- Preserve an existing root `.env` and never fetch or print API keys.
+- Make the script fail clearly when no compatible Python exists.
+- Verify imports for `openai`, `fastapi`, `pydantic` and `httpx`.
+
+### Done when
+
+```sh
+scripts/bootstrap_venv.sh
+.venv/bin/python --version
+.venv/bin/uv --version
+.venv/bin/python -c "import openai, fastapi, pydantic, httpx"
+.venv/bin/uv run pytest
+```
+
+All commands pass and `.venv/bin/python` reports Python 3.12 or 3.13.
 
 ## Task A0 — canonical Signal contract models
 
@@ -96,8 +143,8 @@ Do not add or modify Case, Product, Approval or Execution semantics in this task
 - Invalid enums, missing required fields, naïve timestamps and inconsistent nested
   IDs are rejected.
 - Existing planner schema tests remain valid.
-- `uv run pytest tests/test_signal_contract_models.py` passes.
-- `uv run pytest` still passes, proving the additions preserve starter behavior.
+- `.venv/bin/uv run pytest tests/test_signal_contract_models.py` passes.
+- `.venv/bin/uv run pytest` still passes, proving the additions preserve starter behavior.
 
 ## Task A1 — synthesized dataset loader
 
@@ -143,7 +190,7 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
   repost references fail with typed, sanitized errors.
 - The committed pack covers all five stages and contains no claim that its publishers
   or URLs are real.
-- `uv run pytest tests/test_demo_loader.py` passes.
+- `.venv/bin/uv run pytest tests/test_demo_loader.py` passes.
 
 ## Task A2 — Signal persistence and idempotent ingestion
 
@@ -206,7 +253,7 @@ Do not edit `app/store.py`, `app/schemas.py` or `app/main.py` in this task.
   source identity.
 - Pure repost and independent-report cases behave as specified.
 - A fresh repository instance can read previously written records.
-- `uv run pytest tests/test_signal_ingestion.py` passes.
+- `.venv/bin/uv run pytest tests/test_signal_ingestion.py` passes.
 
 ## Task A3 — Claim extraction service
 
@@ -253,7 +300,7 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 - A mixed post splits only when kind, scope or verification path differs.
 - Invalid quote, invented scope, malformed structured output and exhausted retry paths
   are covered.
-- `uv run pytest tests/test_claim_extraction.py` passes without a real API key.
+- `.venv/bin/uv run pytest tests/test_claim_extraction.py` passes without a real API key.
 
 ## Task A4 — synthesized Evidence verifier
 
@@ -282,7 +329,7 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 - Expose this service boundary:
 
   ```python
-  verify(
+  async verify(
       claim: Claim,
       evidence: list[EvidenceInput],
   ) -> ClaimVerificationResult
@@ -290,7 +337,8 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 
   The result contains the new verification status, canonical Evidence items linked
   to the input `claim_id`, attempt count and sanitized failure; it performs no SQLite
-  write.
+  write. The provider and service boundary are async so A5 never blocks FastAPI's
+  event loop during an OpenAI call.
 - Implement one structured-output OpenAI call receiving the Claim and only the
   supplied Evidence documents.
 - Return the central verification enum and one stance for every input Evidence ID.
@@ -308,7 +356,7 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
 - Supported, refuted, insufficient, conflicting and not-applicable cases are tested.
 - The verifier cannot cite an Evidence ID absent from its input.
 - No test needs network access or a real OpenAI key.
-- `uv run pytest tests/test_claim_verification.py` passes.
+- `.venv/bin/uv run pytest tests/test_claim_verification.py` passes.
 
 ## Task A5 — A API and application composition
 
@@ -345,6 +393,8 @@ This is the only A task allowed to edit `app/main.py`.
   `{ "evidence_ids": ["ev_001"], "current_stage": 4 }`. Require
   `Idempotency-Key` and return the updated canonical `Claim` with HTTP 200.
 - Compose ingest so an extraction call occurs outside all SQLite write transactions.
+- Await extraction and verification calls; do not invoke a synchronous OpenAI client
+  on FastAPI's event loop.
 - Define the injected async `CaseDispatcherProtocol` in `app/signal_api.py` and call
   `dispatch(signal_id)` only after successful persistence and extraction of a new
   Signal. Tests provide a recording fake; this task does not implement Case logic or
@@ -360,7 +410,7 @@ This is the only A task allowed to edit `app/main.py`.
 - API tests cover success, validation, idempotent replay, repost dispatch,
   extraction failure, verification and B-dispatch failure.
 - One failing subsystem never produces a false success response.
-- `uv run pytest tests/test_signal_api.py` passes.
+- `.venv/bin/uv run pytest tests/test_signal_api.py` passes.
 
 ## Task A6 — canonical A fixtures for B
 
@@ -401,7 +451,7 @@ Do not change `contracts/README.md` or shared enums in this task.
 
 - The shared models parse every fixture without aliases or translation code.
 - Fixtures do not claim synthesized sources are real-world announcements.
-- `uv run pytest tests/test_a_contract_fixtures.py` passes.
+- `.venv/bin/uv run pytest tests/test_a_contract_fixtures.py` passes.
 
 ## Task A7 — M1 integration and acceptance
 
@@ -439,8 +489,8 @@ than fixed through broad cross-module rewrites.
 ### Done when
 
 ```sh
-uv run pytest tests/test_a_m1_acceptance.py
-uv run pytest
+.venv/bin/uv run pytest tests/test_a_m1_acceptance.py
+.venv/bin/uv run pytest
 cd frontend && npm run typecheck && npm run build
 git diff --check
 ```

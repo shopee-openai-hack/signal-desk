@@ -1,0 +1,25 @@
+{
+  "dataset_version": "m1-v1",
+  "items": [
+    {
+      "stage": 4,
+      "evidence_id": "ev_oil_support_b123_001",
+      "url": "https://example.test/synthesized/notices/oil-support-001",
+      "title": "Synthesized B123 initial inspection notice (fictional)",
+      "publisher": "Synthesized Food Authority (fictional)",
+      "published_at": "2026-09-12T03:00:00Z",
+      "retrieved_at": "2026-09-12T03:01:00Z",
+      "excerpt": "【合成示範證據】Demo 牌 B123 批次的一件樣本未符合示範標準；本段落不是現實世界的檢驗結果。"
+    },
+    {
+      "stage": 5,
+      "evidence_id": "ev_oil_refute_b123_001",
+      "url": "https://example.test/synthesized/notices/oil-refute-001",
+      "title": "Synthesized B123 corrected inspection notice (fictional)",
+      "publisher": "Synthesized Food Authority (fictional)",
+      "published_at": "2026-09-12T04:00:00Z",
+      "retrieved_at": "2026-09-12T04:02:00Z",
+      "excerpt": "【合成示範證據】複驗確認樣本標示錯誤，Demo 牌 B123 留樣符合示範標準，先前不合格初報已撤回；本段落是虛構資料。"
+    }
+  ]
+}
