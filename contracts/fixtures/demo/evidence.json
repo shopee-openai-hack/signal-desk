@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "evidence_id": "ev_s4_fda_20260701",
+      "claim_id": "clm_s3_fact_zhonglian",
+      "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379",
+      "title": "中聯油脂原料批號 315-1150404 檢驗與流向公告（demo 前需逐字核對）",
+      "publisher": "衛生福利部食品藥物管理署",
+      "published_at": "2026-07-01T08:00:00Z",
+      "retrieved_at": "2026-07-01T08:01:00Z",
+      "excerpt": "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0；流向福懋、福壽、泰山，首波 15 項油品下架。",
+      "stance": "supports"
+    },
+    {
+      "evidence_id": "ev_s5_fda_20260707",
+      "claim_id": "clm_s5_scope_expansion",
+      "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634443",
+      "title": "使用受影響原料製成食品擴大下架公告（demo 前需逐字核對）",
+      "publisher": "衛生福利部食品藥物管理署",
+      "published_at": "2026-07-07T09:00:00Z",
+      "retrieved_at": "2026-07-07T09:01:00Z",
+      "excerpt": "下架範圍擴大為所有使用受影響原料製成之食品，不論使用比例；前一日公告已擴為 360 家、18 項產品、30 批號。",
+      "stance": "supports"
+    },
+    {
+      "evidence_id": "ev_s6_cna_20260723",
+      "claim_id": "clm_s5_all_expanded_batches_affected",
+      "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
+      "title": "中聯油脂案　食藥署公布可重新上架501項產品清單（demo 前需逐字核對）",
+      "publisher": "中央通訊社",
+      "published_at": "2026-07-23T09:04:00Z",
+      "retrieved_at": "2026-07-23T09:05:00Z",
+      "excerpt": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品製成的 501 項產品列入可重新上架清單。",
+      "stance": "refutes"
+    }
+  ]
+}
