@@ -6,26 +6,23 @@ do not silently adapt either side: update this file in a small reviewable commit
 notify the owners of every affected workstream, then update producers before
 consumers.
 
-## Frontend read-model handoff — B review (2026-09-12)
+## Frontend and backend demo integration (2026-09-12)
 
-The frontend branch now has a local HTTP mock for four user-approved read needs:
-`GET /api/v1/signals`, `GET /api/v1/cases/{case_id}/agent-status`,
-`GET /api/v1/traces` and `GET /api/v1/traces/{trace_id}`, and
-`GET /api/v1/cases/{case_id}/approvals` (including execution results).
-The paths and user needs are accepted as integration targets. This B branch now
-serves the Signal inbox and agent-status reads against the merged A store.
-Trace and approval reads remain Node-mock proposals until their producers land;
-A/C/front-end owners should review the field rules before publication.
+The four-page UI now calls FastAPI `/api/v1/demo/*` exclusively. This namespace
+serves controlled six-stage Signal/Case snapshots, the product catalog,
+persisted approvals and per-product executions, agent observations, and saved
+rich Trace reads from one SQLite-backed replay controller. It does not invoke
+A/B's live model flow. The existing `/api/v1/*` Signal ingest, Claim verify,
+Case dispatch/advance and read endpoints remain the canonical live APIs and
+use separate state. Do not present a saved demo phase as a live model run.
 
-See [frontend sync handoff](../frontend/SYNC_STATUS.md) for responsibilities and
-acceptance boundaries, [mock integration notes](../frontend/README.md) for current
-responses, and [rich Trace schema proposal](../frontend/TRACE_CONTRACT_PROPOSAL.md)
-for phase/activity snapshots, observable agent work, and retry history. The rich
-The Node mock trace producer and vertical UI consumer are available; the
-FastAPI trace producer is still pending.
-B has reviewed the mock responses, TypeScript types and API client. Saved Trace
-playback must remain read-only and distinct
-from both live execution and the canonical case timeline.
+The accepted live read targets remain `GET /api/v1/signals`,
+`GET /api/v1/cases/{case_id}/agent-status`, `GET /api/v1/traces`,
+`GET /api/v1/traces/{trace_id}`, and `GET /api/v1/cases/{case_id}/approvals`.
+A+B implement the first two. Live C approval/execution and a live Trace
+producer are still outstanding. The demo namespace implements equivalent
+shapes for the presentation; see [frontend integration notes](../frontend/README.md)
+and [rich Trace schema](../frontend/TRACE_CONTRACT_PROPOSAL.md).
 
 | Read path | Proposed producer | Shape and integration rule |
 |---|---|---|
@@ -296,24 +293,22 @@ development, each owner supplies fixtures matching this contract in
   `CaseStore` and passes `InProcessCaseDispatcher` to A by default. A's
   isolated tests can still inject their recording dispatcher. A cross-workstream
   test covers ingest, repost, verification, Case advance and the inbox read.
-- **B + C products and actions:** C must provide the simulated product catalog
-  to B. C's approval and execution outcomes must appear in the Case timeline;
-  agree on whether `case.version` covers only B assessment revisions or also
-  C's action/status transitions before implementing stale-write checks. New
-  Stage 5 products never inherit Stage 4 approvals.
-- **Frontend mutations:** The mock's reason-only `advanceCase()` request and
-  `{case,previous_version}` response differ from B's versioned
-  `verification_updates` request and raw Case response. A production replay
-  controller must call A verify and B advance with explicit inputs. The UI now
-  shows this replay button only when `/api/v1/mock/status` identifies the Node
-  mock. Do not make the UI button invent Evidence to satisfy the backend.
+- **Live B + C products and actions:** The FastAPI demo namespace now has a
+  simulated catalog, approvals, executions, version checks and timeline events.
+  These records do not yet feed B's live Case store. A future live C producer
+  must use the same approval/action boundaries and decide with B how action
+  status changes affect Case snapshots.
+- **Frontend mutations:** The UI's controlled-replay button calls
+  `POST /api/v1/demo/advance` with `expected_stage`; this is distinct from B's
+  live `POST /api/v1/cases/{case_id}/advance`, which requires a Case version and
+  persisted A verification updates. The saved demo never invents live Evidence.
 - **Replay cursor versus Case version:** The six demo stages are presentation
   steps, not assessment revisions. Stage 2 is a pure repost: the inbox and
   timeline gain a Signal, while the canonical Case stays at v1 with unchanged
   `updated_at`. List-summary `updated_at` reflects the later timeline item.
-  Stages 3–6 use Case versions 2–5. The Node mock and C UI now keep `demo_stage`
-  distinct from `version`.
-- **Trace producer:** Assign the saved trace producer and persist its immutable
-  phases/activities. The current FastAPI app does not yet implement these
-  reads, while the Node mock does. Trace playback remains independent of the
-  live Case timeline and write workflow.
+  Stages 3–6 use Case versions 2–5. The FastAPI demo controller and C UI keep
+  replay `stage` distinct from `version`.
+- **Live Trace producer:** FastAPI serves immutable saved demo phases and
+  activities under `/api/v1/demo/traces`. A producer for actual A/B/C runs and
+  canonical `/api/v1/traces` is still unassigned. Saved Trace playback stays
+  independent of the live Case timeline and write workflow.

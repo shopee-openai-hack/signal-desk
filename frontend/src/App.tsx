@@ -9,7 +9,7 @@ import { Card } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { TracePage } from "./pages/TracePage";
-import type { AgentStatus, ApprovalRecord, CaseSnapshot, CaseSummary, MockStatus, Product, ProductCandidate, Signal, TimelineItem } from "./types";
+import type { AgentStatus, ApprovalRecord, CaseSnapshot, CaseSummary, ReplayStatus, Product, ProductCandidate, Signal, TimelineItem } from "./types";
 
 type Page = "inbox" | "cases" | "case" | "trace";
 type CaseTab = "overview" | "products" | "timeline";
@@ -78,7 +78,7 @@ function missingInformationLabel(value: string) {
 }
 
 function sourceLabel(value: string) {
-  return { saved_mock_observation: "已保存的處理紀錄", backend: "後端觀測" }[value] ?? "觀測資料";
+  return { saved_mock_observation: "已保存的處理紀錄", backend_replay: "已保存的處理紀錄", backend: "後端觀測" }[value] ?? "觀測資料";
 }
 
 function actorLabel(type: string) {
@@ -114,9 +114,9 @@ function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void 
   return <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"><CircleAlert className="mt-0.5 size-4 shrink-0" /><div className="flex-1"><p>{message}</p>{onRetry && <button type="button" onClick={onRetry} className="mt-2 font-semibold underline underline-offset-2">重試</button>}</div></div>;
 }
 
-function Header({ route, onNavigate, mockStatus, collapsed, onToggle }: { route: Route; onNavigate: (path: string) => void; mockStatus: MockStatus | undefined; collapsed: boolean; onToggle: () => void }) {
+function Header({ route, onNavigate, replayStatus, collapsed, onToggle }: { route: Route; onNavigate: (path: string) => void; replayStatus: ReplayStatus | undefined; collapsed: boolean; onToggle: () => void }) {
   const title = route.page === "inbox" ? "市場通報" : route.page === "trace" ? "案件歷程回放" : route.page === "case" ? "案件詳情" : "案件列表";
-  return <header className="sticky top-0 z-10 flex min-h-[72px] items-center justify-between border-b border-stone-200 bg-[#f8f8f5] px-5 sm:px-8"><div className="flex items-center gap-3"><Button variant="ghost" size="icon" className="hidden shrink-0 lg:inline-flex" onClick={onToggle} aria-label={collapsed ? "展開側邊導覽" : "收合側邊導覽"} aria-expanded={!collapsed} title={collapsed ? "展開側邊導覽" : "收合側邊導覽"}>{collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</Button><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div></div><div className="flex items-center gap-3">{mockStatus && <details className="relative text-xs text-stone-500"><summary className="cursor-pointer">展示設定</summary><div className="absolute right-0 top-7 z-30 w-64 rounded-md border bg-white p-4 text-sm leading-6 text-stone-700">目前使用示範資料，第 {mockStatus.stage} / 6 階段。商品操作僅影響示範商品。重置與階段控制可在案件內的展示設定展開。</div></details>}{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
+  return <header className="sticky top-0 z-10 flex min-h-[72px] items-center justify-between border-b border-stone-200 bg-[#f8f8f5] px-5 sm:px-8"><div className="flex items-center gap-3"><Button variant="ghost" size="icon" className="hidden shrink-0 lg:inline-flex" onClick={onToggle} aria-label={collapsed ? "展開側邊導覽" : "收合側邊導覽"} aria-expanded={!collapsed} title={collapsed ? "展開側邊導覽" : "收合側邊導覽"}>{collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</Button><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div></div><div className="flex items-center gap-3">{replayStatus && <details className="relative text-xs text-stone-500"><summary className="cursor-pointer">展示設定</summary><div className="absolute right-0 top-7 z-30 w-64 rounded-md border bg-white p-4 text-sm leading-6 text-stone-700">目前使用示範資料，第 {replayStatus.stage} / 6 階段。商品操作僅影響示範商品。重置與階段控制可在案件內的展示設定展開。</div></details>}{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
 }
 
 function Sidebar({ route, onNavigate, collapsed }: { route: Route; onNavigate: (path: string) => void; collapsed: boolean }) {
@@ -455,7 +455,7 @@ function TimelineTab({ timeline }: { timeline: TimelineItem[] | undefined }) {
   );
 }
 
-function DemoControls({ status, onAdvance, onReset, isAdvancing, isResetting }: { status: MockStatus | undefined; onAdvance: () => void; onReset: (stage: 0 | 3) => void; isAdvancing: boolean; isResetting: boolean }) {
+function DemoControls({ status, onAdvance, onReset, isAdvancing, isResetting }: { status: ReplayStatus | undefined; onAdvance: () => void; onReset: (stage: 0 | 3) => void; isAdvancing: boolean; isResetting: boolean }) {
   if (!status) return null;
   const hasWrites = status.approvals > 0 || status.executions > 0;
   const reset = (stage: 0 | 3) => {
@@ -479,14 +479,14 @@ function DemoControls({ status, onAdvance, onReset, isAdvancing, isResetting }: 
   </details>;
 }
 
-function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProductsLoading, isProductsError, onRetryProducts, mockStatus }: { caseId: string; tab: CaseTab; onNavigate: (path: string) => void; signals: Signal[] | undefined; products: Product[] | undefined; isProductsLoading: boolean; isProductsError: boolean; onRetryProducts: () => void; mockStatus: MockStatus | undefined }) {
+function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProductsLoading, isProductsError, onRetryProducts, replayStatus }: { caseId: string; tab: CaseTab; onNavigate: (path: string) => void; signals: Signal[] | undefined; products: Product[] | undefined; isProductsLoading: boolean; isProductsError: boolean; onRetryProducts: () => void; replayStatus: ReplayStatus | undefined }) {
   const cache = useQueryClient();
   const current = useQuery({ queryKey: ["case", caseId], queryFn: () => api.getCase(caseId) });
   const timeline = useQuery({ queryKey: ["timeline", caseId], queryFn: () => api.getTimeline(caseId) });
   const agent = useQuery({ queryKey: ["agent", caseId], queryFn: () => api.getAgentStatus(caseId) });
   const approvals = useQuery({ queryKey: ["approvals", caseId], queryFn: () => api.getApprovals(caseId) });
-  const advance = useMutation({ mutationFn: () => api.advanceCase(caseId), onSuccess: () => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["agent", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["signals"] }); cache.invalidateQueries({ queryKey: ["mock-status"] }); } });
-  const reset = useMutation({ mutationFn: (stage: 0 | 3) => api.resetMock(stage, true), onSuccess: () => { cache.invalidateQueries(); } });
+  const advance = useMutation({ mutationFn: () => api.advanceDemo(replayStatus?.stage ?? 3), onSuccess: () => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["agent", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["signals"] }); cache.invalidateQueries({ queryKey: ["replay-status"] }); } });
+  const reset = useMutation({ mutationFn: (stage: 0 | 3) => api.resetDemo(stage, true), onSuccess: (_result, stage) => { if (stage === 0) onNavigate("/cases"); cache.invalidateQueries(); } });
   const switchTab = (next: CaseTab) => onNavigate(`/cases/${caseId}/${next}`);
   if (current.isLoading) return <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入案件…</div>;
   if (current.isError || !current.data) return <ErrorNotice error={current.error ?? new Error("案件不存在。")} onRetry={() => current.refetch()} />;
@@ -510,7 +510,7 @@ function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProducts
         </div>
       </div>
 
-      <DemoControls status={mockStatus} onAdvance={() => advance.mutate()} onReset={(stage) => reset.mutate(stage)} isAdvancing={advance.isPending} isResetting={reset.isPending} />
+      <DemoControls status={replayStatus} onAdvance={() => advance.mutate()} onReset={(stage) => reset.mutate(stage)} isAdvancing={advance.isPending} isResetting={reset.isPending} />
 
       <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-0 border-b bg-transparent p-0">
         <TabsTrigger value="overview" className="h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 text-stone-500 shadow-none hover:bg-transparent hover:text-stone-900 data-[state=active]:border-stone-900 data-[state=active]:bg-transparent data-[state=active]:text-stone-900 data-[state=active]:shadow-none">案件概覽</TabsTrigger>
@@ -519,8 +519,8 @@ function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProducts
       </TabsList>
 
       {advance.error && <ErrorNotice error={advance.error} />}
-      {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} isMock={mockStatus?.mode === "mock"} />}
-      {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["mock-status"] }); }} queryError={approvals.error} />}</>}
+      {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} isMock={replayStatus?.mode === "backend_replay"} />}
+      {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["replay-status"] }); }} queryError={approvals.error} />}</>}
       {tab === "timeline" && (timeline.isLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入時間軸…</div> : timeline.isError ? <ErrorNotice error={timeline.error} onRetry={() => timeline.refetch()} /> : <TimelineTab timeline={timeline.data?.items} />)}
       </Tabs>
     </div>
@@ -539,9 +539,12 @@ export default function App() {
   const navigate = useCallback((path: string) => { window.history.pushState({}, "", path); setRoute(readRoute()); window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   useEffect(() => { const listener = () => setRoute(readRoute()); window.addEventListener("popstate", listener); return () => window.removeEventListener("popstate", listener); }, []);
   const cases = useQuery({ queryKey: ["cases"], queryFn: api.listCases });
-  const mockStatus = useQuery({ queryKey: ["mock-status"], queryFn: api.getMockStatus });
+  const replayStatus = useQuery({ queryKey: ["replay-status"], queryFn: api.getReplayStatus });
   const signals = useQuery({ queryKey: ["signals"], queryFn: api.getSignals, enabled: route.page === "inbox" || route.page === "case" });
   const products = useQuery({ queryKey: ["products"], queryFn: api.getProducts, enabled: route.page === "case" && route.tab === "products" });
+  const cache = useQueryClient();
+  const advance = useMutation({ mutationFn: () => api.advanceDemo(replayStatus.data?.stage ?? -1), onSuccess: () => { void cache.invalidateQueries(); } });
+  const reset = useMutation({ mutationFn: (stage: 0 | 3) => api.resetDemo(stage, true), onSuccess: () => { void cache.invalidateQueries(); } });
   const selectedCase = route.page === "case" ? route.caseId : undefined;
-  return <div style={{ "--sidebar-width": sidebarCollapsed ? "72px" : "248px" } as CSSProperties} className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} collapsed={sidebarCollapsed} /><div className={sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[248px]"}><Header route={route} onNavigate={navigate} mockStatus={mockStatus.data} collapsed={sidebarCollapsed} onToggle={toggleSidebar} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} mockStatus={mockStatus.data} />}</main></div></div>;
+  return <div style={{ "--sidebar-width": sidebarCollapsed ? "72px" : "248px" } as CSSProperties} className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} collapsed={sidebarCollapsed} /><div className={sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[248px]"}><Header route={route} onNavigate={navigate} replayStatus={replayStatus.data} collapsed={sidebarCollapsed} onToggle={toggleSidebar} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page !== "case" && <div className="mb-6"><DemoControls status={replayStatus.data} onAdvance={() => advance.mutate()} onReset={(stage) => reset.mutate(stage)} isAdvancing={advance.isPending} isResetting={reset.isPending} />{advance.error && <ErrorNotice error={advance.error} />}{reset.error && <ErrorNotice error={reset.error} />}</div>}{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} replayStatus={replayStatus.data} />}</main></div></div>;
 }

@@ -17,6 +17,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY app/ ./app/
+COPY contracts/fixtures/demo/ ./contracts/fixtures/demo/
 COPY --from=frontend-build /web/dist ./frontend/dist
 
 ENV PORT=8000

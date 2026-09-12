@@ -46,6 +46,9 @@ from .case_schemas import (
     SignalPage, SignalRead, TimelinePage,
 )
 from .case_store import CaseStore, SignalConflict, VersionConflict
+from .demo_replay import (
+    AdvanceDemoRequest, ApprovalRequest, DemoError, DemoReplayStore, ResetRequest,
+)
 
 logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -169,6 +172,7 @@ def create_app(
         app_settings.db_path, app_settings.db_connect_timeout_seconds,
         signal_reader=app_signal_store,
     )
+    demo_replay = DemoReplayStore(app_settings.db_path, app_settings.db_connect_timeout_seconds)
     app_case_decider = case_decider or OpenAICaseDecider(app_settings)
     case_service = CaseService(
         app_case_store, app_case_decider, product_catalog,
@@ -233,6 +237,7 @@ def create_app(
             app_store.init_schema()
             app_signal_store.init_schema()
             app_case_store.init_schema()
+            demo_replay.init_schema()
             if not app_store.ping():
                 app.state.db_ready = False
                 return False
@@ -270,6 +275,7 @@ def create_app(
     app.state.signal_api = app_signal_api
     app.state.case_store = app_case_store
     app.state.case_service = case_service
+    app.state.demo_replay = demo_replay
 
     @app.middleware("http")
     async def request_limits(request: Request, call_next):
@@ -350,6 +356,13 @@ def create_app(
         del request, exc
         return _error("daily_limit_reached", "Case model budget reached for today", 429)
 
+    @app.exception_handler(DemoError)
+    async def demo_error(request: Request, exc: DemoError):
+        del request
+        return JSONResponse(status_code=exc.status, content={"error": {
+            "code": exc.code, "message": exc.message, "details": exc.details,
+        }})
+
     @app.post("/api/v1/cases/dispatch", response_model=CaseSnapshot)
     async def dispatch_case(payload: DispatchRequest, request: Request,
                             idempotency_key: str = Header(min_length=1, max_length=200)):
@@ -409,6 +422,66 @@ def create_app(
             return result if result else _error("case_not_found", "Case not found", 404)
         finally:
             case_concurrency.release()
+
+    if demo_replay:
+        @app.get("/api/v1/demo/status")
+        async def demo_status():
+            return demo_replay.status()
+
+        @app.post("/api/v1/demo/reset")
+        async def demo_reset(payload: ResetRequest):
+            return demo_replay.reset(payload.stage, payload.confirm, payload.scenario)
+
+        @app.post("/api/v1/demo/advance")
+        async def demo_advance(payload: AdvanceDemoRequest,
+                               idempotency_key: str = Header(min_length=1, max_length=200)):
+            return demo_replay.advance(payload.expected_stage, idempotency_key)
+
+        @app.get("/api/v1/demo/products")
+        async def demo_products():
+            return demo_replay.get_products()
+
+        @app.get("/api/v1/demo/cases/{case_id}/approvals")
+        async def demo_approvals(case_id: str):
+            return demo_replay.get_approvals(case_id)
+
+        @app.post("/api/v1/demo/cases/{case_id}/approvals", status_code=201)
+        async def demo_approve(case_id: str, payload: ApprovalRequest,
+                               idempotency_key: str = Header(min_length=1, max_length=200)):
+            return demo_replay.approve(case_id, payload, idempotency_key)
+
+        @app.post("/api/v1/demo/approvals/{approval_id}/execute")
+        async def demo_execute(approval_id: str,
+                               idempotency_key: str = Header(min_length=1, max_length=200)):
+            return demo_replay.execute(approval_id, idempotency_key)
+
+        @app.get("/api/v1/demo/traces")
+        async def demo_traces():
+            return demo_replay.list_traces()
+
+        @app.get("/api/v1/demo/traces/{trace_id}")
+        async def demo_trace(trace_id: str):
+            return demo_replay.get_trace(trace_id)
+
+        @app.get("/api/v1/demo/cases")
+        async def demo_cases():
+            return demo_replay.list_cases()
+
+        @app.get("/api/v1/demo/signals")
+        async def demo_signals():
+            return demo_replay.get_signals()
+
+        @app.get("/api/v1/demo/cases/{case_id}")
+        async def demo_case(case_id: str):
+            return demo_replay.get_case(case_id)
+
+        @app.get("/api/v1/demo/cases/{case_id}/timeline")
+        async def demo_timeline(case_id: str):
+            return demo_replay.get_timeline(case_id)
+
+        @app.get("/api/v1/demo/cases/{case_id}/agent-status")
+        async def demo_agent_status(case_id: str):
+            return demo_replay.get_agent(case_id)
 
     @app.get("/api/config", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:

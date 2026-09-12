@@ -217,9 +217,10 @@ infer a value from the current case snapshot.
 
 ## Producer and consumer mapping
 
-The Node mock produces phases and activities, and TracePage renders them as a
-vertical timeline with expandable details. FastAPI does not yet provide a
-saved Trace producer.
+FastAPI serves saved phases and activities under `/api/v1/demo/traces`, and
+TracePage renders them as a vertical timeline with expandable details. The
+records originated as synthetic fixture data; a live A/B/C Trace producer is
+still outstanding.
 
 | Contract field | Mock producer | Trace consumer |
 | --- | --- | --- |
