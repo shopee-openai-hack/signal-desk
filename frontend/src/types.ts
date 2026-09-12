@@ -26,6 +26,7 @@ export interface MonitoringPlan {
 export interface CaseSummary {
   case_id: string;
   version: number;
+  demo_stage?: number;
   title: string;
   status: CaseStatus;
   business_impact: BusinessImpact;
@@ -312,6 +313,31 @@ export interface Trace extends TraceSummary {
 export interface ListResponse<T> {
   items: T[];
   next_cursor: string | null;
+}
+
+export interface MockProvenance {
+  dataset_id: string;
+  replay_window: string;
+  source: string;
+  warning: string;
+  expected_state_note: string;
+  boundaries: {
+    external_evidence: string;
+    simulated_listing: string;
+    controlled_replay: string;
+    simulated_batch_mapping: string;
+  };
+}
+
+export interface MockStatus {
+  stage: number;
+  default_stage: number;
+  scenario: string;
+  mode: "mock" | string;
+  dataset_id: string;
+  provenance: MockProvenance;
+  approvals: number;
+  executions: number;
 }
 
 export interface ApprovalResponse {

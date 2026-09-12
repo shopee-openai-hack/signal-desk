@@ -11,6 +11,7 @@ import type {
   TimelineItem,
   Trace,
   TraceSummary,
+  MockStatus,
 } from "../types";
 
 export class ApiError extends Error {
@@ -54,6 +55,7 @@ export const api = {
   getSignals: () => request<ListResponse<Signal>>("/api/v1/signals"),
   getAgentStatus: (caseId: string) => request<AgentStatus>(`/api/v1/cases/${caseId}/agent-status`),
   getApprovals: (caseId: string) => request<ListResponse<ApprovalRecord>>(`/api/v1/cases/${caseId}/approvals`),
+  getMockStatus: () => request<MockStatus>("/api/v1/mock/status"),
   listTraces: () => request<ListResponse<TraceSummary>>("/api/v1/traces"),
   getTrace: (traceId: string) => request<Trace>(`/api/v1/traces/${traceId}`),
   createApproval: (caseId: string, body: { case_version: number; product_ids: string[]; approved_by?: string }) =>
@@ -68,10 +70,15 @@ export const api = {
       headers: mutationHeaders(idempotencyKey),
       body: JSON.stringify({}),
     }),
-  advanceCase: (caseId: string) =>
+  advanceCase: (caseId: string, reason = "Demo 以新證據示範案件版本更新") =>
     request<{ case: CaseSnapshot; previous_version: number }>(`/api/v1/cases/${caseId}/advance`, {
       method: "POST",
       headers: mutationHeaders(`advance-${caseId}-${Date.now()}`),
-      body: JSON.stringify({ reason: "Demo 以新證據示範案件版本更新" }),
+      body: JSON.stringify({ reason }),
+    }),
+  resetMock: (stage: number, confirm = false, scenario = "main") =>
+    request<{ status: "reset"; mode: "mock"; stage: number; scenario: string; dataset_id: string }>("/api/v1/mock/reset", {
+      method: "POST",
+      body: JSON.stringify({ stage, confirm, scenario }),
     }),
 };
