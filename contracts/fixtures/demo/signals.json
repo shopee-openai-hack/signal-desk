@@ -58,11 +58,11 @@
     {
       "stage": 6,
       "provider": "news",
-      "source_id": "cna_20260724",
-      "url": "https://www.cna.com.tw/news/ahel/202607240147.aspx",
+      "source_id": "cna_20260723",
+      "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
       "author_ref": null,
-      "published_at": "2026-07-21T10:00:00Z",
-      "raw_text": "30 批逐批檢驗，7 批不合格銷毀、1 批無留樣、19 批合格放行，涉 501 項產品重新上架。",
+      "published_at": "2026-07-23T09:04:00Z",
+      "raw_text": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品由泰山、福懋及福壽製成共 501 項產品，可重新上架。",
       "source_relation": "original",
       "duplicate_of_source_id": null
     }

@@ -13,13 +13,13 @@ Last updated: 2026-09-12
 |---|---|---|
 | 真實外部證據 | 食藥署公告與新聞報導，URL 與日期為真 | evidence 的 `publisher` 為真實機構；摘錄需在 demo 前逐字核對 |
 | 模擬平台資料 | 商品 listing、賣家、價格、商品宣告的原料批號 | 每筆 `is_simulated: true`；品牌名沿用公告中的真實品牌 |
-| 可控時間回放 | 六段輸入的 `published_at` 沿用事件真實日期；時刻為模擬 | 畫面標示「回放：2026-06-30 至 2026-07-21」 |
+| 可控時間回放 | 公告與新聞的 `published_at` 依可取得的來源時間記錄；模擬 Threads 貼文使用情境時間 | 畫面標示「回放：2026-06-30 至 2026-07-23」 |
 
-真實批號只有一個：中聯原料批號 `315-1150404`。其餘批號（`315-1150398`、`315-1150411`）為模擬，用來展示「其他批號排除」與「擴大後再放行」。公告 7/6 提到 30 個批號、7/21 提到 19 批放行，真實批號清單未取得，demo 以模擬批號代表，文件與畫面均標示。
+真實批號只有一個：中聯原料批號 `315-1150404`。其餘批號（`315-1150398`、`315-1150411`）為模擬，用來展示「其他批號排除」與「擴大後再放行」。7/23 報導提到 19 批合格油品製成的 501 項產品可重新上架，但真實批號清單未取得；demo 將模擬批號 `315-1150411` 映射為合格批次代表，文件與畫面均標示，外部證據本身不宣稱該批號存在或已放行。
 
 ## 使用者
 
-Operation 部門負責 listing 的營運人員（demo 帳號 `employee_ops_listing`）。客服與賣家管理是同部門的後續受益者，口頭帶過，不做流程。
+Operation 部門的商品安全／Listing Risk 營運人員（demo 帳號 `employee_ops_listing`）。此人負責檢視召回證據、確認 listing 處置範圍及核可模擬下架。客服與賣家管理是後續受益者，口頭帶過，不做流程。
 
 ## 六段輸入
 
@@ -82,14 +82,14 @@ Operation 部門負責 listing 的營運人員（demo 帳號 `employee_ops_listi
 - 案件不應該：新候選商品自動下架（不繼承 Stage 4 的核可）；已下架的三筆被重新評估為未下架；把所有加工食品列入候選。
 - 員工動作（可選）：對加工食品候選提出新核可並執行；對批號 `315-1150411` 的候選選擇「待補證」，不核可。
 
-### Stage 6 — 逐批檢驗部分放行（2026-07-21T10:00Z）
+### Stage 6 — 逐批檢驗部分放行（2026-07-23T09:04Z）
 
-- 來源：新聞報導 `cna_20260724`，`provider: news`，中央社報導 7/21 檢驗結果
-- URL：https://www.cna.com.tw/news/ahel/202607240147.aspx （另見 https://www.gvm.com.tw/article/131784）
-- 內容要點：30 批逐批檢驗，7 批不合格銷毀、1 批無留樣、19 批合格放行，涉 501 項產品重新上架。
-- 證明：部分擴大批號被反駁；批號級判斷有必要（約三分之二批次合格）。
+- 來源：新聞報導 `cna_20260723`，`provider: news`，中央社報導全面檢驗結案及可重新上架清單
+- URL：https://www.cna.com.tw/news/ahel/202607230245.aspx
+- 內容要點（demo 前需逐字核對）：全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品由泰山、福懋及福壽製成共 501 項產品，可重新上架。
+- 證明：不是所有擴大列管批次都仍有問題；批號級判斷有必要，合格批次製成的產品可進入重新上架評估。
 - 不證明：315-1150404 放行（該批次仍為不合格）；已下架商品應自動恢復。
-- 案件應該：`verification_updated`：模擬批號 `315-1150411` 標為「已放行」，其福壽商品關聯改為 `excluded`，理由引用報導。`assessment_updated`：`priority` 從 critical 降為 high，理由「主要下架已完成、部分批號放行、剩餘未知為批號未知的候選商品」。時間軸保留 Stage 5 的判斷與理由，不覆蓋。監控計畫：追蹤頻率降低，下一次檢查改為等待官方後續公告。
+- 案件應該：`verification_updated`：外部證據反駁「擴大列管的所有批次都仍有問題」；回放將模擬批號 `315-1150411` 映射為合格批次代表，其福壽商品關聯改為 `excluded`，理由同時標示外部證據與模擬映射。`assessment_updated`：`priority` 從 critical 降為 high，理由「主要下架已完成、部分批號放行、剩餘未知為批號未知的候選商品」。時間軸保留 Stage 5 的判斷與理由，不覆蓋。監控計畫：追蹤頻率降低，下一次檢查改為等待官方後續公告。
 - 案件不應該：把已下架商品自動改回 `active`（恢復需新的員工動作，本次不做）；把 315-1150404 的商品也視為放行；因為「有批次合格」而下修整個案件到 medium 以下（仍有 7 批不合格與批號未知商品）。
 
 ## 模擬商品表
@@ -103,21 +103,21 @@ Operation 部門負責 listing 的營運人員（demo 帳號 `employee_ops_listi
 | prod_003 | 福壽 | 大豆沙拉油 2L | 315-1150404 | seller_sim_003 | active | S3 candidate → S4 confirmed → 核可後 delisted |
 | prod_004 | 福壽 | 大豆沙拉油 2L | 315-1150398 | seller_sim_003 | active | S3 起 excluded（其他批號），維持 active |
 | prod_005 | 福懋 | 大豆沙拉油 18L 業務用 | 315-1150404 | seller_sim_004 | active | S4 confirmed → 核可後 delisted |
-| prod_006 | 泰山 | 花生油 1L | null | seller_sim_001 | active | S1 candidate（品牌吻合）→ S4 excluded（原料不同），維持 active |
+| prod_006 | 泰山 | 花生油 1L | null | seller_sim_001 | active | S1 不列入（非沙拉油）→ S4 excluded（原料不同），維持 active |
 | prod_007 | 示範食品（模擬品牌） | 沙茶醬 250g，宣告使用福壽沙拉油 | 315-1150404 | seller_sim_005 | active | S5 candidate，需新核可；核可後 delisted |
 | prod_008 | 得意的一天（無關品牌） | 葵花油 1L | null | seller_sim_006 | active | 全程不列入，維持 active |
-| prod_009 | 福壽 | 大豆沙拉油 2L | 315-1150411（模擬） | seller_sim_003 | active | S5 candidate → S6 excluded（批號放行），維持 active |
+| prod_009 | 福壽 | 大豆沙拉油 2L | 315-1150411（模擬；JSON 存純批號） | seller_sim_003 | active | S5 candidate → S6 excluded（回放映射為合格批次），維持 active |
 
 ## 六段結束時的案件狀態摘要
 
 | Stage | business_impact | priority | case_status | confirmed | candidate | excluded | delisted |
 |---|---|---|---|---|---|---|---|
-| 1 | pending | medium | monitoring | — | 001, 002, 006 | — | — |
+| 1 | pending | medium | monitoring | — | 001, 002 | — | — |
 | 2 | pending | medium | monitoring | — | 同上 | — | — |
-| 3 | risk | high | investigating | — | 001, 002, 003, 006 | 004 | — |
+| 3 | risk | high | investigating | — | 001, 002, 003 | 004 | — |
 | 4 | risk | critical | awaiting_approval → actioned | 001, 003, 005 | 002 | 004, 006 | 001, 003, 005 |
 | 5 | risk | critical | awaiting_approval | 001, 003, 005 | 002, 007, 009 | 004, 006 | 001, 003, 005（+007 若核可） |
-| 6 | risk | high | investigating | 001, 003, 005 | 002 | 004, 006, 009 | 同上 |
+| 6 | risk | high | investigating | 001, 003, 005 | 002, 007 | 004, 006, 009 | 同上 |
 
 ## 這組輸入刻意不包含的東西
 

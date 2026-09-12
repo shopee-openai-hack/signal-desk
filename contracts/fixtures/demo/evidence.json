@@ -23,14 +23,14 @@
       "stance": "supports"
     },
     {
-      "evidence_id": "ev_s6_cna_20260724",
-      "claim_id": "clm_s5_batch_315_1150411",
-      "url": "https://www.cna.com.tw/news/ahel/202607240147.aspx",
-      "title": "中聯油脂 30 批逐批檢驗結果報導（demo 前需逐字核對）",
+      "evidence_id": "ev_s6_cna_20260723",
+      "claim_id": "clm_s5_all_expanded_batches_affected",
+      "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
+      "title": "中聯油脂案　食藥署公布可重新上架501項產品清單（demo 前需逐字核對）",
       "publisher": "中央通訊社",
-      "published_at": "2026-07-21T10:00:00Z",
-      "retrieved_at": "2026-07-21T10:01:00Z",
-      "excerpt": "30 批逐批檢驗中，7 批不合格銷毀、1 批無留樣、19 批合格放行，涉及 501 項產品重新上架。",
+      "published_at": "2026-07-23T09:04:00Z",
+      "retrieved_at": "2026-07-23T09:05:00Z",
+      "excerpt": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品製成的 501 項產品列入可重新上架清單。",
       "stance": "refutes"
     }
   ]

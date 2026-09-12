@@ -8,8 +8,8 @@
       "case_status": "monitoring",
       "priority_reasons": ["潛在消費者健康風險", "品牌與在售商品吻合", "來源單一且二手"],
       "candidate_products": [
-        {"product_id":"prod_001","relation":"candidate","reason":"品牌吻合，批號未知","missing_information":["batch"]},
-        {"product_id":"prod_002","relation":"candidate","reason":"品牌吻合，批號未知","missing_information":["batch"]}
+        {"product_id":"prod_001","relation":"candidate","reason":"品牌吻合，事件的受影響批號未知","missing_information":["affected_batch"]},
+        {"product_id":"prod_002","relation":"candidate","reason":"品牌吻合，商品批號與事件的受影響批號均未知","missing_information":["batch","affected_batch"]}
       ],
       "expected_product_status": {"prod_001":"active","prod_002":"active","prod_003":"active","prod_004":"active","prod_005":"active","prod_006":"active","prod_007":"active","prod_008":"active","prod_009":"active"},
       "must_not": ["把「味道怪」當成證據", "把非沙拉油的泰山商品列入候選", "升到 high 以上"]
@@ -21,8 +21,8 @@
       "case_status": "monitoring",
       "priority_reasons": ["純轉傳沒有新增獨立來源或新事實，維持原判斷"],
       "candidate_products": [
-        {"product_id":"prod_001","relation":"candidate","reason":"品牌吻合，批號未知","missing_information":["batch"]},
-        {"product_id":"prod_002","relation":"candidate","reason":"品牌吻合，批號未知","missing_information":["batch"]}
+        {"product_id":"prod_001","relation":"candidate","reason":"品牌吻合，事件的受影響批號未知","missing_information":["affected_batch"]},
+        {"product_id":"prod_002","relation":"candidate","reason":"品牌吻合，商品批號與事件的受影響批號均未知","missing_information":["batch","affected_batch"]}
       ],
       "expected_product_status": {"prod_001":"active","prod_002":"active","prod_003":"active","prod_004":"active","prod_005":"active","prod_006":"active","prod_007":"active","prod_008":"active","prod_009":"active"},
       "must_not": ["重跑查核", "把獨立回報數從 1 算成 2", "建立新案件"]
@@ -72,8 +72,8 @@
         {"product_id":"prod_004","relation":"excluded","reason":"宣告批號不在已證實範圍","missing_information":[]},
         {"product_id":"prod_005","relation":"confirmed","reason":"品牌與批號均與官方公告吻合","missing_information":[]},
         {"product_id":"prod_006","relation":"excluded","reason":"商品原料類型不同，不是沙拉油","missing_information":[]},
-        {"product_id":"prod_007","relation":"candidate","reason":"宣告使用受影響原料，需新的員工核可","missing_information":["approval"]},
-        {"product_id":"prod_009","relation":"candidate","reason":"批號在擴大清單，待賣家補件","missing_information":["seller_documentation"]}
+        {"product_id":"prod_007","relation":"candidate","reason":"宣告使用受影響原料，但真實公告未直接確認此模擬 listing","missing_information":["product_level_confirmation"]},
+        {"product_id":"prod_009","relation":"candidate","reason":"回放將模擬批號列入擴大範圍，待賣家補件","missing_information":["seller_documentation"]}
       ],
       "expected_product_status": {"prod_001":"delisted","prod_002":"active","prod_003":"delisted","prod_004":"active","prod_005":"delisted","prod_006":"active","prod_007":"active","prod_008":"active","prod_009":"active"},
       "must_not": ["讓新候選商品自動下架或繼承 Stage 4 核可", "把已下架的三筆重新評估為未下架", "把所有加工食品列入候選"]
@@ -91,8 +91,8 @@
         {"product_id":"prod_004","relation":"excluded","reason":"宣告批號不在已證實範圍","missing_information":[]},
         {"product_id":"prod_005","relation":"confirmed","reason":"315-1150404 仍為不合格批號","missing_information":[]},
         {"product_id":"prod_006","relation":"excluded","reason":"商品原料類型不同，不是沙拉油","missing_information":[]},
-        {"product_id":"prod_007","relation":"candidate","reason":"宣告使用受影響原料，仍待新的員工核可","missing_information":["approval"]},
-        {"product_id":"prod_009","relation":"excluded","reason":"模擬批號 315-1150411 已放行","missing_information":[]}
+        {"product_id":"prod_007","relation":"candidate","reason":"宣告使用受影響原料，但真實公告未直接確認此模擬 listing","missing_information":["product_level_confirmation"]},
+        {"product_id":"prod_009","relation":"excluded","reason":"外部證據顯示部分批次已放行；回放將模擬批號 315-1150411 映射為合格批次","missing_information":[]}
       ],
       "expected_product_status": {"prod_001":"delisted","prod_002":"active","prod_003":"delisted","prod_004":"active","prod_005":"delisted","prod_006":"active","prod_007":"active","prod_008":"active","prod_009":"active"},
       "must_not": ["把已下架商品自動改回 active", "把 315-1150404 的商品視為放行", "把整個案件降到 medium 以下"]

@@ -10,7 +10,7 @@ Last updated: 2026-09-12
 
 ## 給 A：訊號抽取與外部查核
 
-A 從 `contracts/fixtures/demo/signals.json` 取得六段 ingestion 輸入，從 `contracts/fixtures/demo/evidence.json` 取得 Stage 4–6 的查核證據，並以 `docs/demo/demo-pack.md` 的「證明／不證明」作為語意邊界。Stage 1 必須抽出三種陳述：推測「泰山某批沙拉油正被通路收回」、個人經驗「作者自家的油味道怪」、需求「詢問其他人是否遇到」；不可把個人經驗升格成食安證據。Stage 2 必須辨識為 `post_001` 的 repost，Stage 3 必須保留不同作者帶入的新品牌、上游與批號。Stage 4 支持 `clm_s3_fact_zhonglian`，Stage 5 支持 `clm_s5_scope_expansion`，Stage 6 對模擬批號 `315-1150411` 的陳述提供 refutes 證據。尚未定的是 Threads 實際蒐集方式、失敗狀態樣本，以及來源重試與成本上限；公告和新聞的標題、發布日期、數字與摘錄也需在 demo 前由人員開啟原始來源逐字核對，尤其 Stage 6 的回放結果日期與新聞頁 URL 日期要確認如何呈現。
+A 從 `contracts/fixtures/demo/signals.json` 取得六段 ingestion 輸入，從 `contracts/fixtures/demo/evidence.json` 取得 Stage 4–6 的查核證據，並以 `docs/demo/demo-pack.md` 的「證明／不證明」作為語意邊界。Stage 1 必須抽出三種陳述：推測「泰山某批沙拉油正被通路收回」、個人經驗「作者自家的油味道怪」、需求「詢問其他人是否遇到」；不可把個人經驗升格成食安證據。Stage 2 必須辨識為 `post_001` 的 repost，Stage 3 必須保留不同作者帶入的新品牌、上游與批號。Stage 4 支持 `clm_s3_fact_zhonglian`，Stage 5 支持 `clm_s5_scope_expansion`；Stage 6 的中央社證據反駁「擴大列管的所有批次都仍有問題」，而 `315-1150411` 是回放中映射到合格批次的模擬批號，不能宣稱新聞直接提到它。尚未定的是 Threads 實際蒐集方式、失敗狀態樣本，以及來源重試與成本上限；公告和新聞的標題、發布日期、數字與摘錄需由 A 在 demo 前逐字核對，再交 Morris 最終簽核。
 
 ## 給 B：案件分派與適應
 
@@ -18,4 +18,4 @@ B 從 `contracts/fixtures/demo/signals.json` 與 `contracts/fixtures/demo/eviden
 
 ## 給 C：案件畫面、核可與模擬下架
 
-C 從 `contracts/fixtures/demo/products.json` 取得九筆起始商品，從 `contracts/fixtures/demo/expected_case_states.json` 取得各段畫面預期，以 `docs/demo/demo-script.md` 的六分鐘走位和 `docs/demo/acceptance-checklist.md` 驗收。起始狀態為九筆 `active`、零案件。Stage 4 只允許 `prod_001`、`prod_003`、`prod_005` 進入核可清單；核可與執行後三筆改為 `delisted`，立即重新整理仍須保持該狀態，並能從時間軸追到案件版本、核可與執行結果。Stage 5 的 `prod_007`、`prod_009` 必須顯示需要新核可，不能自動下架；本輪主線不執行可選核可。Stage 6 的放行只把尚未核可的 `prod_009` 改為 excluded，已下架商品不自動恢復。尚未定的是一鍵重置指令、現場畫面實際欄位位置、備援影片路徑與展示裝置；C 完成後需把 `TBD by C` 和備援勾選項補齊。
+C 從 `contracts/fixtures/demo/products.json` 取得九筆起始商品，從 `contracts/fixtures/demo/expected_case_states.json` 取得各段畫面預期，以 `docs/demo/demo-script.md` 和 `docs/demo/acceptance-checklist.md` 驗收。D 定義舞台順序、操作與必須可辨識的業務結果；畫面布局、導覽方式及 UI 元件由 C 決定。完整整合路徑仍支援九筆 `active`、零案件依序回放 Stage 1–6；六分鐘舞台路徑需能一鍵重置到 Stage 3 結束狀態：同一案件已有三則訊號、`risk`／`high`／`investigating`、九筆商品仍為 `active`，且沒有核可或執行紀錄。Stage 4 只允許 `prod_001`、`prod_003`、`prod_005` 進入核可清單；核可與執行後三筆改為 `delisted`，立即重新整理仍須保持該狀態，並能從時間軸追到案件版本、核可與執行結果。Stage 5 的 `prod_007`、`prod_009` 必須顯示需要新核可，不能自動下架；本輪主線不執行可選核可。Stage 6 的放行只把尚未核可的 `prod_009` 改為 excluded，已下架商品不自動恢復。尚未定的是一鍵重置指令、備援影片路徑與展示裝置；C 完成後需把 `TBD by C` 和備援勾選項補齊。
