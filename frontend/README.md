@@ -1,6 +1,6 @@
 # Signal Desk：FastAPI 受控 Demo
 
-四個頁面（訊號收件匣、案件列表、案件詳情與 Trace）都透過相對 `/api/v1/demo/*` HTTP requests 讀取同一個 FastAPI 後端。商品核可與模擬執行由後端寫入 SQLite；重新整理或重啟後端仍會保留操作結果。前端不再連接獨立 Node mock service。
+四個頁面（市場通報、案件列表、案件詳情與案件歷程回放）都透過相對 `/api/v1/demo/*` HTTP requests 讀取同一個 FastAPI 後端。商品核可與模擬執行由後端寫入 SQLite；重新整理或重啟後端仍會保留操作結果。前端不再連接獨立 Node mock service。
 
 ## 啟動
 
@@ -38,7 +38,7 @@ cd frontend && npm ci && npm run dev -- --strictPort
 2. 在商品頁勾選三筆，建立核可，再點明確執行。重新整理後商品、核可與逐項結果仍可見。未完成此步會被後端阻擋進入 Stage 5。
 3. 進入 Stage 5，`prod_007`、`prod_009` 為新候選，不繼承舊核可。Stage 6 只排除 `prod_009`，不自動恢復既有下架商品。
 4. Trace 頁展示保存的 phases／activities、證據引用、前後快照與重試歷史；播放不觸發上述 mutation。
-5. 可在任一頁重置 Stage 3 或從 Stage 0 逐段回放；Stage 0 的案件列表為空，頂部仍有「下一 Stage」控制。
+5. 可在任一頁重置 Stage 3 或從 Stage 0 逐段回放；Stage 0 的案件列表為空，可展開「展示設定」繼續推進。
 
 這是**由 FastAPI 保存與提供的受控案例回放**，資料快照來自 `contracts/fixtures/demo/backend_replay.json`，不是執行中的 OpenAI 判讀。正常 A+B ingest／verify／Case API 保留在 `/api/v1`，與 demo namespace 的 SQLite 狀態分開；真實訊號尚不會自動變成受控回放的一段。Trace 也是保存的合成紀錄，不是現場 agent telemetry。外部公告及新聞仍需 demo 前逐字核對，商品均為模擬 listing。
 
