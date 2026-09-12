@@ -1,0 +1,56 @@
+name: Test and deploy
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.11.15'
+          python-version: '3.12'
+      - run: uv sync --frozen --dev
+      - run: uv run pytest
+      - run: npm ci && npm run typecheck && npm run build
+        working-directory: frontend
+      - run: docker build -t hackathon-ci .
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.RAILWAY_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: railway-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Deploy tested source and verify readiness
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          test -n "$RAILWAY_TOKEN" && test -n "$RAILWAY_SERVICE_ID" && test -n "$RAILWAY_ENVIRONMENT_ID" && test -n "$APP_URL"
+          npx --yes @railway/cli@5.52.1 up --service "$RAILWAY_SERVICE_ID" --environment "$RAILWAY_ENVIRONMENT_ID" --detach --json > deployment.json
+          python3 scripts/check_deployment.py "$RAILWAY_SERVICE_ID" "$RAILWAY_ENVIRONMENT_ID" "$APP_URL" deployment.json
