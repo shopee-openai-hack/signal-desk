@@ -2,7 +2,7 @@
 
 Status: Ready for assignment
 Source spec: `SPEC.md`
-Workstream: A — synthesized signal ingestion and verification
+Workstream: A — controlled signal ingestion and verification
 
 ## How to use this file
 
@@ -41,10 +41,9 @@ No task below requires a new answer from A, B, D or the user before it starts:
 1. `contracts/README.md` is the field and enum authority. Task A0 translates its
    existing Signal, Claim and Evidence shapes into the one shared Pydantic
    implementation; it does not redesign them.
-2. `issues/01a-synthesized-data-handoff.md` is the M1 scenario authority. Task A1
-   owns writing the complete committed synthesized pack that satisfies its stages and
-   checklist. The content must remain clearly synthetic; no later approval is a task
-   completion condition.
+2. `docs/demo/demo-pack.md` and `contracts/fixtures/demo/` are the M1 scenario
+   authority. D owns their content. Task A1 owns reading and validating the approved
+   six-stage pack and must not create a second dataset.
 3. A hands a new Signal to B through an injected async
    `CaseDispatcherProtocol.dispatch(signal_id: str) -> None`. Implementation and tests
    use this interface directly; defining Case grouping or `Case.signal_ids` is outside
@@ -99,7 +98,7 @@ Do not add or modify Case, Product, Approval or Execution semantics in this task
 - `uv run pytest tests/test_signal_contract_models.py` passes.
 - `uv run pytest` still passes, proving the additions preserve starter behavior.
 
-## Task A1 — synthesized dataset loader
+## Task A1 — controlled dataset loader
 
 ### Goal
 
@@ -110,8 +109,6 @@ resources without any network or LLM call.
 
 ```text
 app/demo_loader.py
-app/demo_data/m1_sources.json
-app/demo_data/m1_evidence.json
 tests/test_demo_loader.py
 ```
 
@@ -119,21 +116,21 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
 
 ### Work
 
-- Implement input-only Pydantic models for the provider-neutral dataset envelopes in
+- Implement input-only Pydantic models for the provider-neutral fixture shapes in
   SPEC sections 5.2 and 5.3. These are loader input models, not replacements for the
   shared canonical contract.
 - Implement `load_sources(stage)` returning only the requested stage in stable
-  `(retrieved_at, source_id)` order.
+  `(published_at, source_id)` order. The ingestion layer supplies `retrieved_at`
+  through an injected clock; tests freeze that clock.
 - Implement `load_evidence(evidence_ids, current_stage)` and prevent early access to
-  later-stage Evidence.
-- Validate dataset version, unique provider/source identity, UTC timestamps and valid
-  repost references.
-- Add the complete five-stage M1 synthesized pack described by the handoff document:
-  initial experience, pure repost, independent report or scoped hypothesis, later
-  supporting Evidence, and a later refuting or insufficient-Evidence path.
-- Choose stable synthetic copy, IDs and expected relationships while implementing the
-  pack. Do not pause for copy review; the committed pack becomes the deterministic M1
-  baseline and can be revised through an ordinary later diff.
+  later-stage Evidence. Derive availability by matching each Evidence URL to exactly
+  one source item at Stage 4, 5 or 6.
+- Validate unique provider/source identity, UTC timestamps, Evidence-to-source URL
+  matches and valid repost references.
+- Read `contracts/fixtures/demo/signals.json` and
+  `contracts/fixtures/demo/evidence.json` directly. Treat Evidence `claim_id` and
+  `stance` as scenario expectations that must bind to an extracted runtime Claim;
+  fail replay visibly if the binding cannot be made.
 
 ### Done when
 
@@ -141,8 +138,8 @@ Do not edit `app/schemas.py` or `app/main.py` in this task.
 - Stage N never returns earlier stages again.
 - Missing Evidence IDs, future-stage Evidence, duplicate source IDs and invalid
   repost references fail with typed, sanitized errors.
-- The committed pack covers all five stages and contains no claim that its publishers
-  or URLs are real.
+- The loader covers all six stages without copying or rewriting D's approved fixture
+  content.
 - `uv run pytest tests/test_demo_loader.py` passes.
 
 ## Task A2 — Signal persistence and idempotent ingestion
@@ -255,12 +252,12 @@ Do not edit `app/planner.py`, `app/schemas.py` or `app/main.py` in this task.
   are covered.
 - `uv run pytest tests/test_claim_extraction.py` passes without a real API key.
 
-## Task A4 — synthesized Evidence verifier
+## Task A4 — supplied Evidence verifier
 
 ### Goal
 
 Implement a callable verifier that compares one canonical Claim with explicitly
-supplied synthesized Evidence and returns no unsupported verdict. Persistence is
+supplied Evidence and returns no unsupported verdict. Persistence is
 performed by the composition layer through Task A2's repository.
 
 ### Code prerequisites
@@ -335,7 +332,7 @@ This is the only A task allowed to edit `app/main.py`.
 
 - Implement `POST /api/v1/signals/ingest` following the central error and
   `Idempotency-Key` conventions.
-- Implement `POST /api/v1/claims/{claim_id}/verify` with explicit synthesized
+- Implement `POST /api/v1/claims/{claim_id}/verify` with explicit
   `evidence_ids` and current replay stage.
 - Define the ingest request body exactly as the source dataset item without `stage`:
   `{ "source": {...}, "source_relation": "...", "duplicate_of_source_id": null }`.
@@ -400,7 +397,8 @@ Do not change `contracts/README.md` or shared enums in this task.
 ### Done when
 
 - The shared models parse every fixture without aliases or translation code.
-- Fixtures do not claim synthesized sources are real-world announcements.
+- Fixtures preserve the distinction between simulated Threads posts and captured
+  external-source excerpts, including the required pre-demo source check notes.
 - `uv run pytest tests/test_a_contract_fixtures.py` passes.
 
 ## Task A7 — M1 integration and acceptance

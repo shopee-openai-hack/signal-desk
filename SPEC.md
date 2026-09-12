@@ -1,4 +1,4 @@
-# SPEC — A/M1 synthesized signal ingestion and verification
+# SPEC — A/M1 controlled signal ingestion and verification
 
 Status: Approved for A/M1 implementation
 Owner: A — signal ingestion and external verification
@@ -6,9 +6,10 @@ Last updated: 2026-09-12
 
 ## 1. Purpose
 
-M1 turns a controlled synthesized market-signal dataset into canonical Signals and
-Claims that B can route into evolving Cases. It also provides a callable verifier
-that compares a Claim with synthesized Evidence when B requests verification.
+M1 turns D's approved, controlled six-stage market-signal dataset into canonical
+Signals and Claims that B can route into evolving Cases. It also provides a callable
+verifier that compares a Claim with the supplied Evidence when B requests
+verification.
 
 This specification refines the A workstream in `INTENT.md`. `INTENT.md` remains the
 product-scope authority, and `contracts/README.md` remains the shared API and data
@@ -20,13 +21,13 @@ pause for additional cross-workstream confirmation.
 The first milestone must support this controlled sequence:
 
 ```text
-synthesized post
+controlled source item
 → persisted Signal
 → LLM-extracted Claim units
 → signal_id handed to B
 → B attaches the Signal to a new or existing Case
 → B requests verification for a selected Claim
-→ A compares the Claim with synthesized Evidence
+→ A compares the Claim with supplied Evidence
 → B receives the persisted verification result
 ```
 
@@ -39,13 +40,13 @@ backend key for extraction and verification.
 
 ### 3.1 A owns
 
-- Loading the versioned synthesized source and evidence datasets.
+- Loading and validating D's approved source and evidence fixtures.
 - Persisting source text, provenance, source time and retrieval time.
 - Idempotent ingestion of the same provider source.
 - Preserving explicit repost relationships and independent reports.
 - Extracting Claim units from each post with a bounded LLM call.
 - Validating extracted output against the shared schema and original text.
-- Comparing a Claim with supplied synthesized Evidence.
+- Comparing a Claim with supplied Evidence.
 - Persisting verification results, Evidence links and failed attempts.
 - Providing canonical Signal fixtures that B can parse without translation.
 
@@ -67,9 +68,9 @@ resource.
 - Reviewable later revisions to intended source relationships and Evidence meaning.
 - Business expectations for escalation, no-change and downgrade paths.
 
-A1 materializes the approved requirements as the committed deterministic M1 source
-and Evidence files, including concrete synthetic copy, IDs and timestamps. That
-materialization does not require another pre-implementation approval.
+D owns the fixture content and business expectations under
+`contracts/fixtures/demo/`. A1 owns the loader and validation code and must not create
+a second scenario dataset.
 
 Detailed A/D handoff expectations are recorded in
 `issues/01a-synthesized-data-handoff.md`.
@@ -117,39 +118,38 @@ A Case is B's persistent grouping of related Signals and Claims. New Signals may
 Claims to the same Case over time. Pure reposts can join the Case without adding a new
 Claim.
 
-## 5. Synthesized datasets
+## 5. Controlled demo dataset
 
 ### 5.1 Storage
 
-The M1 implementation will read two committed, versioned resources:
+The M1 implementation reads D's committed resources directly:
 
 ```text
-app/demo_data/m1_sources.json
-app/demo_data/m1_evidence.json
+contracts/fixtures/demo/signals.json
+contracts/fixtures/demo/evidence.json
 ```
 
-The files are product demo inputs, not golden model outputs. Canonical integration
-fixtures produced by A remain under `contracts/fixtures/`.
+`products.json` and `expected_case_states.json` are B/C evaluation inputs and are not
+copied into A-owned storage. The six-stage scenario mixes simulated Threads posts
+with captured external-source excerpts. No live fetch occurs during replay. Every
+external excerpt remains subject to the pre-demo source check stated in the demo
+pack.
 
 ### 5.2 Source dataset shape
 
-The source dataset uses a minimal provider-neutral envelope:
+The source fixture uses the approved flat provider-neutral item shape:
 
 ```json
 {
-  "dataset_version": "m1-v1",
   "items": [
     {
       "stage": 1,
-      "source": {
-        "provider": "synthesized",
-        "source_id": "post_001",
-        "url": "https://example.test/post/001",
-        "author_ref": "user_001",
-        "published_at": "2026-09-12T01:55:00Z",
-        "retrieved_at": "2026-09-12T02:00:00Z",
-        "raw_text": "我買的 Demo 牌食用油有怪味。"
-      },
+      "provider": "threads",
+      "source_id": "post_001",
+      "url": "https://example.test/post/001",
+      "author_ref": "user_001",
+      "published_at": "2026-06-30T05:20:00Z",
+      "raw_text": "朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來……",
       "source_relation": "original",
       "duplicate_of_source_id": null
     }
@@ -159,43 +159,50 @@ The source dataset uses a minimal provider-neutral envelope:
 
 Requirements:
 
-- `dataset_version` is required so fixture changes are visible and reviewable.
 - `stage` is a positive integer used for controlled replay, not a production time
   scheduler.
-- All timestamps are explicit UTC ISO 8601 values so replay is deterministic.
+- `published_at` is an explicit UTC ISO 8601 value.
 - `source_id` is unique within a provider.
 - A repost identifies the original item using `duplicate_of_source_id`.
 - The dataset supplies `source_relation` in M1; A does not infer independent-report
   status with an LLM.
 - The dataset does not include runtime `signal_id`, `claim_id` or model verdicts.
+- The loader sorts each stage by `(published_at, source_id)`. Ingestion writes
+  `retrieved_at` from an injected replay clock; deterministic tests use a frozen
+  clock, while production code records the actual acquisition time.
 
 ### 5.3 Evidence dataset shape
 
 ```json
 {
-  "dataset_version": "m1-v1",
   "items": [
     {
-      "stage": 4,
-      "evidence_id": "ev_001",
-      "url": "https://example.test/evidence/001",
-      "title": "Synthesized food-safety notice",
-      "publisher": "Synthesized authority",
-      "published_at": "2026-09-12T03:00:00Z",
-      "retrieved_at": "2026-09-12T03:01:00Z",
-      "excerpt": "Demo 牌 B123 批次檢驗不合格。"
+      "evidence_id": "ev_s4_fda_20260701",
+      "claim_id": "clm_s3_fact_zhonglian",
+      "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379",
+      "title": "中聯油脂原料批號 315-1150404 檢驗與流向公告（demo 前需逐字核對）",
+      "publisher": "衛生福利部食品藥物管理署",
+      "published_at": "2026-07-01T08:00:00Z",
+      "retrieved_at": "2026-07-01T08:01:00Z",
+      "excerpt": "中聯油脂批號 315-1150404 大豆沙拉油……",
+      "stance": "supports"
     }
   ]
 }
 ```
 
-The Evidence dataset contains provenance and content, not a hard-coded overall
-verification verdict. The A/D handoff and deterministic acceptance tests define the
-expected paths without treating them as runtime model output.
+The Evidence fixture contains provenance, excerpt, expected claim binding and stance.
+`claim_id` and `stance` are evaluation expectations, not a hard-coded overall model
+verdict. At composition time A binds the expectation to the extracted runtime Claim;
+if no matching Claim exists, replay fails visibly instead of fabricating one.
+
+Evidence availability is derived by matching its URL to the source fixture and using
+that source item's stage. Every approved Evidence URL has exactly one matching source
+item in Stage 4, 5 or 6; missing or ambiguous matches are fixture validation errors.
 
 ### 5.4 Controlled replay
 
-The loader exposes sources in ascending `(stage, retrieved_at, source_id)` order.
+The loader exposes sources in ascending `(stage, published_at, source_id)` order.
 Processing stage N returns only items newly available in stage N; it does not return
 all earlier Signals again.
 
@@ -204,7 +211,7 @@ load_sources(stage: int) -> list[SourceInput]
 load_evidence(evidence_ids: list[str], current_stage: int) -> list[EvidenceInput]
 ```
 
-An Evidence item cannot be loaded before its configured stage.
+An Evidence item cannot be loaded before its derived source stage.
 
 ## 6. Ingestion and source relationships
 
@@ -334,13 +341,13 @@ rather than repairing it into a stronger verdict.
 
 ### 8.4 Official announcement behavior
 
-M1 does not monitor official websites. The committed pack introduces a synthesized
-announcement in a later replay stage. The same document may serve as:
+M1 does not monitor official websites. The committed pack introduces captured
+external-source excerpts in later replay stages. The same document may serve as:
 
 - A newly ingested Signal that B attaches to the Case.
 - Evidence cited when verifying an earlier Claim.
 
-These roles reference the same underlying synthesized document and do not count as
+These roles reference the same underlying external-source document and do not count as
 two independent sources.
 
 ## 9. Persistence and failure behavior
@@ -436,7 +443,7 @@ translation.
 
 ### Verification
 
-- The verifier uses only the supplied synthesized Evidence.
+- The verifier uses only the supplied Evidence.
 - Supported and refuted results cite matching Evidence.
 - Missing, irrelevant or unresolved conflicting Evidence produces
   `insufficient_evidence`.
@@ -460,12 +467,12 @@ does not redefine their business meaning.
 | Preserve source text, provenance and weak signals | INT-G1, INT-G3 | INT-C1, INT-C5 | INT-S1, INT-S11 |
 | Retain reposts without treating them as independent evidence | INT-G3 | INT-C12 | INT-S2, INT-S12 |
 | Extract source-grounded Claim units | INT-G1, INT-G4 | INT-C3, INT-C4, INT-C7 | INT-S3, INT-S4 |
-| Compare Claims with traceable synthesized Evidence | INT-G4, INT-G7 | INT-C5, INT-C10 | INT-S3, INT-S9 |
+| Compare Claims with traceable supplied Evidence | INT-G4, INT-G7 | INT-C5, INT-C10 | INT-S3, INT-S9 |
 | Hand new Signals and verification updates to B | INT-G6, INT-G7, INT-G8 | INT-C10, INT-C11 | INT-S8, INT-S10, INT-S12 |
 | Controlled staged replay | INT-G8, INT-G9 | INT-C11, INT-C13 | INT-S10, INT-S13 |
 
 The precise source, scenario and scheduling questions remain governed by INT-Q3,
-INT-Q4, INT-Q7, INT-Q10 and INT-Q11. M1 answers only the synthesized-data and
+INT-Q4, INT-Q7, INT-Q10 and INT-Q11. M1 answers only the controlled-data and
 controlled-replay portion of those questions.
 
 ## 13. Frozen M1 integration decisions
@@ -473,8 +480,8 @@ controlled-replay portion of those questions.
 1. A0 implements the existing central Signal, Claim and Evidence fields as the one
    shared Pydantic model set in `app/schemas.py`; this is translation to code, not a
    new schema design.
-2. A1 writes the complete deterministic synthesized pack from the approved A/D
-   handoff. Later copy refinements do not block implementation or acceptance.
+2. A1 reads and validates D's approved six-stage pack in
+   `contracts/fixtures/demo/`; it does not write or copy a second pack.
 3. A hands every newly analyzed Signal to an injected async
    `dispatch(signal_id)` interface. B-side Case storage and HTTP transport choices do
    not change A's interface.
@@ -484,6 +491,6 @@ controlled-replay portion of those questions.
 
 ## 14. M2 extension points
 
-M2 may replace the synthesized loader with a Threads source adapter and a live evidence
+M2 may replace the controlled loader with a Threads source adapter and a live evidence
 retriever. Those adapters must map into the same canonical Signal and Evidence models.
 M1 does not pre-implement provider-specific pagination, monitoring or search behavior.
