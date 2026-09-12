@@ -8,7 +8,7 @@ import { Card } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { TracePage } from "./pages/TracePage";
-import type { AgentStatus, ApprovalRecord, CaseSnapshot, CaseSummary, Product, ProductCandidate, Signal, TimelineItem } from "./types";
+import type { AgentStatus, ApprovalRecord, CaseSnapshot, CaseSummary, MockStatus, Product, ProductCandidate, Signal, TimelineItem } from "./types";
 
 type Page = "inbox" | "cases" | "case" | "trace";
 type CaseTab = "overview" | "products" | "timeline";
@@ -105,9 +105,9 @@ function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void 
   return <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"><CircleAlert className="mt-0.5 size-4 shrink-0" /><div className="flex-1"><p>{message}</p>{onRetry && <button type="button" onClick={onRetry} className="mt-2 font-semibold underline underline-offset-2">重試</button>}</div></div>;
 }
 
-function Header({ route, onNavigate }: { route: Route; onNavigate: (path: string) => void }) {
+function Header({ route, onNavigate, mockStatus }: { route: Route; onNavigate: (path: string) => void; mockStatus: MockStatus | undefined }) {
   const title = route.page === "inbox" ? "訊號收件匣" : route.page === "trace" ? "Trace 回放" : route.page === "case" ? "案件詳情" : "案件列表";
-  return <header className="sticky top-0 z-10 flex min-h-[74px] items-center justify-between border-b border-stone-200/80 bg-[#f8f8f5]/90 px-8 backdrop-blur"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div><div className="flex items-center gap-3"><Pill tone="orange"><span className="mr-1.5 size-1.5 rounded-full bg-orange-500" />Mock 模式</Pill>{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
+  return <header className="sticky top-0 z-10 flex min-h-[74px] items-center justify-between border-b border-stone-200/80 bg-[#f8f8f5]/90 px-8 backdrop-blur"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Signal desk</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1></div><div className="flex items-center gap-3"><Pill tone="orange"><span className="mr-1.5 size-1.5 rounded-full bg-orange-500" />Mock 模式</Pill>{mockStatus && <Pill tone="neutral">Stage {mockStatus.stage} / 6</Pill>}{route.page === "case" && <button type="button" onClick={() => onNavigate("/cases")} className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-white hover:text-stone-900 sm:flex"><ArrowLeft className="size-4" />回到案件列表</button>}</div></header>;
 }
 
 function Sidebar({ route, onNavigate }: { route: Route; onNavigate: (path: string) => void }) {
@@ -330,7 +330,7 @@ function ProductsTab({ current, products, approvals, onInvalidate, queryError }:
               </TableRow>
             </TableHeader>
             <TableBody>
-              {current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || Boolean(approvalStale)} onToggle={() => toggle(candidate.product_id)} />)}
+              {current.candidate_products.map((candidate) => <ProductRow key={candidate.product_id} candidate={candidate} product={productMap.get(candidate.product_id)} selected={selected.includes(candidate.product_id)} disabled={createApproval.isPending || Boolean(approvalStale) || (current.version === 4 && candidate.relation !== "confirmed")} onToggle={() => toggle(candidate.product_id)} />)}
             </TableBody>
           </Table>
         </div>
@@ -432,19 +432,33 @@ function TimelineTab({ timeline }: { timeline: TimelineItem[] | undefined }) {
   );
 }
 
-function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProductsLoading, isProductsError, onRetryProducts }: { caseId: string; tab: CaseTab; onNavigate: (path: string) => void; signals: Signal[] | undefined; products: Product[] | undefined; isProductsLoading: boolean; isProductsError: boolean; onRetryProducts: () => void }) {
+function DemoControls({ status, onAdvance, onReset, isAdvancing, isResetting }: { status: MockStatus | undefined; onAdvance: () => void; onReset: (stage: 0 | 3) => void; isAdvancing: boolean; isResetting: boolean }) {
+  if (!status) return null;
+  const hasWrites = status.approvals > 0 || status.executions > 0;
+  const reset = (stage: 0 | 3) => {
+    if (hasWrites && !window.confirm("此回放已有核可或執行紀錄；重置會清除本機 mock 狀態，確定繼續嗎？")) return;
+    onReset(stage);
+  };
+  return <Panel className="border-orange-200 bg-orange-50/50 p-4 shadow-none"><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Pill tone="orange">受控回放 Stage {status.stage} / 6</Pill><span className="text-xs text-stone-500">回放：{status.provenance.replay_window}</span></div><p className="mt-2 text-xs leading-5 text-stone-600">{status.provenance.boundaries.external_evidence} {status.provenance.boundaries.simulated_listing}</p><p className="mt-1 text-xs leading-5 text-orange-900">{status.provenance.warning}</p></div><div className="flex shrink-0 flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => reset(3)} disabled={isResetting}><RotateCcw className={`size-3.5 ${isResetting ? "animate-spin" : ""}`} />重置 Stage 3</Button><Button type="button" size="sm" variant="outline" onClick={() => reset(0)} disabled={isResetting}>從 Stage 0 開始</Button><Button type="button" size="sm" onClick={onAdvance} disabled={isAdvancing || status.stage >= 6}>{isAdvancing ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowRight className="size-3.5" />}下一 Stage</Button></div></div>{status.stage === 3 && <p className="mt-3 border-t border-orange-200 pt-3 text-xs leading-5 text-stone-600">舞台預設停在 Stage 3：三則訊號、risk／high／investigating、九筆商品均 active，尚無核可或執行。</p>}{status.stage === 4 && <p className="mt-3 border-t border-orange-200 pt-3 text-xs leading-5 text-orange-900">Stage 4 先等待人員核可；只能選 prod_001、prod_003、prod_005，核可後仍需明確執行。</p>}</Panel>;
+}
+
+function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProductsLoading, isProductsError, onRetryProducts, mockStatus }: { caseId: string; tab: CaseTab; onNavigate: (path: string) => void; signals: Signal[] | undefined; products: Product[] | undefined; isProductsLoading: boolean; isProductsError: boolean; onRetryProducts: () => void; mockStatus: MockStatus | undefined }) {
   const cache = useQueryClient();
   const current = useQuery({ queryKey: ["case", caseId], queryFn: () => api.getCase(caseId) });
   const timeline = useQuery({ queryKey: ["timeline", caseId], queryFn: () => api.getTimeline(caseId) });
   const agent = useQuery({ queryKey: ["agent", caseId], queryFn: () => api.getAgentStatus(caseId) });
   const approvals = useQuery({ queryKey: ["approvals", caseId], queryFn: () => api.getApprovals(caseId) });
-  const advance = useMutation({ mutationFn: () => api.advanceCase(caseId), onSuccess: () => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["agent", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); } });
+  const advance = useMutation({ mutationFn: () => api.advanceCase(caseId), onSuccess: () => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["agent", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["signals"] }); cache.invalidateQueries({ queryKey: ["mock-status"] }); } });
+  const reset = useMutation({ mutationFn: (stage: 0 | 3) => api.resetMock(stage, true), onSuccess: () => { cache.invalidateQueries(); } });
   const switchTab = (next: CaseTab) => onNavigate(`/cases/${caseId}/${next}`);
   if (current.isLoading) return <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入案件…</div>;
   if (current.isError || !current.data) return <ErrorNotice error={current.error ?? new Error("案件不存在。")} onRetry={() => current.refetch()} />;
   const snapshot = current.data;
   return (
-    <Tabs value={tab} onValueChange={(value) => switchTab(value as CaseTab)} className="space-y-6">
+    <div className="space-y-6">
+      <DemoControls status={mockStatus} onAdvance={() => advance.mutate()} onReset={(stage) => reset.mutate(stage)} isAdvancing={advance.isPending} isResetting={reset.isPending} />
+      {reset.error && <ErrorNotice error={reset.error} />}
+      <Tabs value={tab} onValueChange={(value) => switchTab(value as CaseTab)} className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
@@ -468,9 +482,10 @@ function CaseDetailPage({ caseId, tab, onNavigate, signals, products, isProducts
 
       {advance.error && <ErrorNotice error={advance.error} />}
       {tab === "overview" && <OverviewTab current={snapshot} signals={signals} agent={agent.data} onAdvance={() => advance.mutate()} isAdvancing={advance.isPending} />}
-      {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); }} queryError={approvals.error} />}</>}
+      {tab === "products" && <>{isProductsLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入商品…</div> : isProductsError ? <ErrorNotice error={new Error("商品資料讀取失敗。請重試。")} onRetry={onRetryProducts} /> : <ProductsTab current={snapshot} products={products} approvals={approvals.data?.items} onInvalidate={() => { cache.invalidateQueries({ queryKey: ["case", caseId] }); cache.invalidateQueries({ queryKey: ["cases"] }); cache.invalidateQueries({ queryKey: ["products"] }); cache.invalidateQueries({ queryKey: ["timeline", caseId] }); cache.invalidateQueries({ queryKey: ["approvals", caseId] }); cache.invalidateQueries({ queryKey: ["mock-status"] }); }} queryError={approvals.error} />}</>}
       {tab === "timeline" && (timeline.isLoading ? <div role="status" className="flex items-center gap-2 text-sm text-stone-500"><Loader2 className="size-4 animate-spin" />載入時間軸…</div> : timeline.isError ? <ErrorNotice error={timeline.error} onRetry={() => timeline.refetch()} /> : <TimelineTab timeline={timeline.data?.items} />)}
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }
 
@@ -479,8 +494,9 @@ export default function App() {
   const navigate = useCallback((path: string) => { window.history.pushState({}, "", path); setRoute(readRoute()); window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   useEffect(() => { const listener = () => setRoute(readRoute()); window.addEventListener("popstate", listener); return () => window.removeEventListener("popstate", listener); }, []);
   const cases = useQuery({ queryKey: ["cases"], queryFn: api.listCases });
+  const mockStatus = useQuery({ queryKey: ["mock-status"], queryFn: api.getMockStatus });
   const signals = useQuery({ queryKey: ["signals"], queryFn: api.getSignals, enabled: route.page === "inbox" || route.page === "case" });
   const products = useQuery({ queryKey: ["products"], queryFn: api.getProducts, enabled: route.page === "case" });
   const selectedCase = route.page === "case" ? route.caseId : undefined;
-  return <div className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} /><div className="lg:pl-[248px]"><Header route={route} onNavigate={navigate} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} />}</main></div></div>;
+  return <div className="min-h-screen bg-[#f8f8f5] text-stone-900"><Sidebar route={route} onNavigate={navigate} /><div className="lg:pl-[248px]"><Header route={route} onNavigate={navigate} mockStatus={mockStatus.data} /><MobileNav route={route} onNavigate={navigate} /><main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">{route.page === "cases" && <CasesPage cases={cases.data?.items} isLoading={cases.isLoading} isError={cases.isError} onRetry={() => cases.refetch()} onNavigate={navigate} />}{route.page === "inbox" && <InboxPage signals={signals.data?.items} isLoading={signals.isLoading} isError={signals.isError} onRetry={() => signals.refetch()} onNavigate={navigate} />}{route.page === "trace" && <TracePage onNavigate={navigate} Pill={Pill} Panel={Panel} ErrorNotice={ErrorNotice} statusLabel={statusLabel} statusTone={statusTone} />}{route.page === "case" && selectedCase && <CaseDetailPage caseId={selectedCase} tab={route.tab ?? "overview"} onNavigate={navigate} signals={signals.data?.items} products={products.data?.items} isProductsLoading={products.isLoading} isProductsError={products.isError} onRetryProducts={() => products.refetch()} mockStatus={mockStatus.data} />}</main></div></div>;
 }
