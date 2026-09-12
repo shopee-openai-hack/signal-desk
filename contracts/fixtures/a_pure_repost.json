@@ -1,0 +1,16 @@
+{
+  "signal_id": "sig_s2_post_002",
+  "source": {
+    "provider": "threads",
+    "source_id": "post_002",
+    "url": "https://example.test/post/002",
+    "author_ref": "user_002",
+    "published_at": "2026-06-30T10:05:00Z",
+    "retrieved_at": "2026-06-30T10:05:00Z",
+    "raw_text": "轉貼：朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來……有人也遇到嗎？",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "repost",
+  "duplicate_of_signal_id": "sig_s1_post_001",
+  "claims": []
+}

@@ -1,0 +1,58 @@
+{
+  "signal_id": "sig_s3_post_003",
+  "source": {
+    "provider": "threads",
+    "source_id": "post_003",
+    "url": "https://example.test/post/003",
+    "author_ref": "user_003",
+    "published_at": "2026-07-01T01:40:00Z",
+    "retrieved_at": "2026-07-01T01:40:00Z",
+    "raw_text": "我在蝦皮買的福壽大豆沙拉油，瓶身標示原料批號 315-1150404。今天看到說中聯油脂的大豆油驗出苯駢芘超標，福壽是不是也用中聯的油？已經開了兩瓶，很擔心。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "independent_report",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_s3_fact_purchase_batch",
+      "signal_id": "sig_s3_post_003",
+      "kind": "fact",
+      "quote": "我在蝦皮買的福壽大豆沙拉油，瓶身標示原料批號 315-1150404",
+      "normalized_statement": "作者表示在蝦皮購買的福壽大豆沙拉油標示原料批號 315-1150404",
+      "entities": [
+        {"type": "platform", "name": "蝦皮"},
+        {"type": "brand", "name": "福壽"}
+      ],
+      "scope": {"region": null, "batch": "315-1150404", "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s3_fact_zhonglian",
+      "signal_id": "sig_s3_post_003",
+      "kind": "fact",
+      "quote": "今天看到說中聯油脂的大豆油驗出苯駢芘超標",
+      "normalized_statement": "中聯油脂的大豆油被指稱驗出苯駢芘超標",
+      "entities": [
+        {"type": "supplier", "name": "中聯油脂"}
+      ],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s3_hypothesis_supplier",
+      "signal_id": "sig_s3_post_003",
+      "kind": "hypothesis",
+      "quote": "福壽是不是也用中聯的油？",
+      "normalized_statement": "福壽可能使用中聯的油",
+      "entities": [
+        {"type": "brand", "name": "福壽"},
+        {"type": "supplier", "name": "中聯"}
+      ],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    }
+  ]
+}

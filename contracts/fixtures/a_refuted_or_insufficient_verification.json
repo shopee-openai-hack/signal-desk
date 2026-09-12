@@ -1,0 +1,51 @@
+{
+  "signal_id": "sig_s5_fda_20260707",
+  "source": {
+    "provider": "fda_tw",
+    "source_id": "fda_20260707",
+    "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634443",
+    "author_ref": null,
+    "published_at": "2026-07-07T09:00:00Z",
+    "retrieved_at": "2026-07-07T09:00:00Z",
+    "raw_text": "擴大為所有使用受影響原料製成之食品，不論比例，7/8 24 時前全面下架。前一日 7/6 公告已擴為 360 家、18 項產品、30 批號。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "original",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_s5_scope_expansion",
+      "signal_id": "sig_s5_fda_20260707",
+      "kind": "fact",
+      "quote": "擴大為所有使用受影響原料製成之食品，不論比例，7/8 24 時前全面下架",
+      "normalized_statement": "所有使用受影響原料製成的食品不論比例，均須在 7/8 24 時前全面下架",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": "7/8 24 時前"},
+      "verification_status": "insufficient_evidence",
+      "evidence": [
+        {
+          "evidence_id": "ev_s6_cna_20260723",
+          "claim_id": "clm_s5_scope_expansion",
+          "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
+          "title": "中聯油脂案　食藥署公布可重新上架501項產品清單（demo 前需逐字核對）",
+          "publisher": "中央通訊社",
+          "published_at": "2026-07-23T09:04:00Z",
+          "retrieved_at": "2026-07-23T09:05:00Z",
+          "excerpt": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品製成的 501 項產品列入可重新上架清單。",
+          "stance": "context_only"
+        }
+      ]
+    },
+    {
+      "claim_id": "clm_s5_prior_scope_count",
+      "signal_id": "sig_s5_fda_20260707",
+      "kind": "fact",
+      "quote": "前一日 7/6 公告已擴為 360 家、18 項產品、30 批號",
+      "normalized_statement": "7/6 公告已擴大為 360 家、18 項產品及 30 批號",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": "7/6"},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    }
+  ]
+}

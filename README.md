@@ -6,8 +6,9 @@ Deployed infrastructure, verification evidence and remaining gates: [INFRA_STATU
 
 ## Local development（隊友與 Codex 從這裡開始）
 
-在 repo 根目錄工作。需要 Git、Node.js 22（含 npm）、uv；Python 使用 3.12，
-`uv sync` 會依需要準備 Python。一般本機開發不需要 Docker、Railway CLI 或雲端存取權。
+在 repo 根目錄工作。需要 Git、Node.js 22（含 npm），以及 Python 3.12 或 3.13。
+專案的 `uv` 與 Python packages 都安裝在 repo-local `.venv`；不依賴全域 `uv`。
+一般本機開發不需要 Docker、Railway CLI 或雲端存取權。
 
 ### 1. 初次設定
 
@@ -22,10 +23,11 @@ cd starter-repo
 
 ```sh
 node --version
-uv --version
+python3.12 --version  # 或 python3.13
 # 保留既有 .env，不覆寫隊友已設定的 key。
 test -f .env || cp .env.example .env
-uv sync --frozen --dev --python 3.12
+scripts/bootstrap_venv.sh
+.venv/bin/uv --version
 (cd frontend && npm ci)
 ```
 
@@ -37,7 +39,7 @@ uv sync --frozen --dev --python 3.12
 Terminal A，在 repo 根目錄啟動 FastAPI：
 
 ```sh
-uv run uvicorn app.main:app --reload --env-file .env --port 8000
+.venv/bin/uv run uvicorn app.main:app --reload --env-file .env --port 8000
 ```
 
 Terminal B，在 repo 根目錄啟動 Vite：
@@ -88,7 +90,7 @@ curl -fsS http://localhost:5173/api/config
 在 repo 根目錄：
 
 ```sh
-uv run pytest
+.venv/bin/uv run pytest
 (cd frontend && npm run typecheck && npm run build)
 git diff --check
 ```
@@ -103,7 +105,7 @@ Docker 修改可另外執行 `docker build -t hackathon-local .`，需要啟動 
 
 ```sh
 (cd frontend && npm run build)
-PUBLIC_ORIGIN=http://localhost:8000 uv run uvicorn app.main:app --env-file .env --port 8000
+PUBLIC_ORIGIN=http://localhost:8000 .venv/bin/uv run uvicorn app.main:app --env-file .env --port 8000
 ```
 
 開啟 http://localhost:8000，由 FastAPI 同時提供前端與 API。這只覆寫此次程序的 origin，

@@ -1,0 +1,56 @@
+{
+  "signal_id": "sig_s4_fda_20260701",
+  "source": {
+    "provider": "fda_tw",
+    "source_id": "fda_20260701",
+    "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634379",
+    "author_ref": null,
+    "published_at": "2026-07-01T08:00:00Z",
+    "retrieved_at": "2026-07-01T08:00:00Z",
+    "raw_text": "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0；流向福懋 588 公噸、福壽 421 公噸、泰山 291 公噸；首波 15 項油品下架。",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "original",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_s4_official_finding",
+      "signal_id": "sig_s4_fda_20260701",
+      "kind": "fact",
+      "quote": "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸苯駢芘 8.1 μg/kg，超過限量 2.0",
+      "normalized_statement": "中聯油脂批號 315-1150404 大豆沙拉油約 1,300 公噸的苯駢芘檢出量 8.1 μg/kg，超過限量 2.0",
+      "entities": [
+        {"type": "supplier", "name": "中聯油脂"}
+      ],
+      "scope": {"region": null, "batch": "315-1150404", "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s4_official_distribution",
+      "signal_id": "sig_s4_fda_20260701",
+      "kind": "fact",
+      "quote": "流向福懋 588 公噸、福壽 421 公噸、泰山 291 公噸",
+      "normalized_statement": "流向為福懋 588 公噸、福壽 421 公噸及泰山 291 公噸",
+      "entities": [
+        {"type": "brand", "name": "福懋"},
+        {"type": "brand", "name": "福壽"},
+        {"type": "brand", "name": "泰山"}
+      ],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s4_official_delisting",
+      "signal_id": "sig_s4_fda_20260701",
+      "kind": "fact",
+      "quote": "首波 15 項油品下架",
+      "normalized_statement": "首波共有 15 項油品下架",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    }
+  ]
+}

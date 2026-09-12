@@ -1,0 +1,52 @@
+{
+  "signal_id": "sig_s1_post_001",
+  "source": {
+    "provider": "threads",
+    "source_id": "post_001",
+    "url": "https://example.test/post/001",
+    "author_ref": "user_001",
+    "published_at": "2026-06-30T05:20:00Z",
+    "retrieved_at": "2026-06-30T05:20:00Z",
+    "raw_text": "朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來，不知道發生什麼事。我家上週剛買一桶，味道好像有點怪，有人也遇到嗎？",
+    "retrieval_status": "succeeded"
+  },
+  "source_relation": "original",
+  "duplicate_of_signal_id": null,
+  "claims": [
+    {
+      "claim_id": "clm_s1_hypothesis_recall",
+      "signal_id": "sig_s1_post_001",
+      "kind": "hypothesis",
+      "quote": "朋友在賣場上班，說今天接到通知要先把泰山某批沙拉油收起來",
+      "normalized_statement": "泰山某批沙拉油可能正被通路收回",
+      "entities": [
+        {"type": "brand", "name": "泰山"}
+      ],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s1_experience_smell",
+      "signal_id": "sig_s1_post_001",
+      "kind": "experience",
+      "quote": "我家上週剛買一桶，味道好像有點怪",
+      "normalized_statement": "作者表示自家上週購買的一桶油味道好像有點怪",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": "上週"},
+      "verification_status": "not_applicable",
+      "evidence": []
+    },
+    {
+      "claim_id": "clm_s1_request_peers",
+      "signal_id": "sig_s1_post_001",
+      "kind": "request",
+      "quote": "有人也遇到嗎？",
+      "normalized_statement": "作者詢問是否有其他人遇到相同情況",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": null},
+      "verification_status": "not_applicable",
+      "evidence": []
+    }
+  ]
+}
