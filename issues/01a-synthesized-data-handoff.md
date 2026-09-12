@@ -1,4 +1,4 @@
-# A ↔ D — M1 synthesized data handoff
+# A ↔ D — M1 controlled demo data handoff
 
 Status: Approved M1 handoff baseline
 Last updated: 2026-09-12
@@ -9,7 +9,8 @@ M1 的資料交接方式。產品範圍仍以 `INTENT.md` 為準，共用 API／
 
 ## 已確認的 M1 邊界
 
-- 訊號與查核證據都使用 committed synthesized dataset。
+- 訊號與查核證據都使用 D committed 的 controlled dataset；Stage 1–3 是模擬 Threads
+  貼文，Stage 4–6 保留真實 FDA/CNA 外部來源 provenance。
 - Source acquisition 不呼叫 LLM，也不連接 Threads API。
 - 每篇新貼文最多執行一次 claim-extraction LLM call；格式不合法時最多再 retry 一次。
 - Event grouping、case routing、priority 與是否重新查核由 B 負責。
@@ -32,57 +33,59 @@ Claim 是從一篇市場貼文抽出的「可獨立理解或處理的陳述單�
 ### Evidence
 
 Evidence 是用來評估某一 Claim 的另一份資料，例如公告、檢驗結果或新聞來源。
-Verifier 的輸入必須同時包含 Claim 與當下可用的 synthesized Evidence；LLM 只能
+Verifier 的輸入必須同時包含 Claim 與當下可用的 committed Evidence；LLM 只能
 依這些 Evidence 判斷，不得使用未提供的背景知識補足證據。
 
 例如：
 
 ```text
-Claim：Demo 牌 B123 批次食用油不合格
-Evidence：模擬的主管機關公告，明確列出 Demo 牌 B123 批次
+Claim：中聯油脂批號 315-1150404 大豆油驗出苯駢芘超標
+Evidence：Stage 4 食藥署公告，明確列出該供應商、批號與檢驗結果
 Result：supported
 ```
 
 ## M1 scenario 資料責任
 
-D 負責確認 scenario 的 stage 與商業語意；A1 負責把這些要求具體化成 committed
-deterministic dataset，包括：
+D 負責確認 scenario 的 stage 與商業語意，並已將六階段 committed
+deterministic dataset 放在 `contracts/fixtures/demo/`；A1 負責轉換成 runtime
+Signal/Evidence input，包括：
 
-1. 每個 demo stage 出現的 synthesized posts。
+1. 每個 demo stage 出現的 replay sources。
 2. 每篇 post 的原文、來源、發布時間與 repost relationship。
-3. 後續 stage 出現的 synthesized evidence documents。
+3. 後續 stage 出現的 committed Evidence documents。
 4. 每份 evidence 可支持、反駁或無法決定哪些 scenario statement。
 5. 每個 stage 預期改變或保持不變的商業判斷；這些是 acceptance expectation，
    不是 hard-coded model output。
 
 D 不需要產生 runtime `signal_id` 或 `claim_id`；這些由 A 產生。
 
-D owner 已確認此設計。為了讓實作不被跨組排程卡住，A1 會依下列 stages 與 checklist
-直接提交一份完整、明確標示為 synthesized 的 deterministic M1 pack；該 commit 即為
-M1 baseline，後續若要調整文案或商業 expectation，走一般 reviewable diff，不是開工
-前置條件。
+D owner 已確認並上傳此設計。`docs/demo/demo-pack.md` 是六階段商業語意
+authority；`contracts/fixtures/demo/signals.json` 與 `evidence.json` 是 A 的機器可讀
+input。Evidence 內 D 提供的 `claim_id` 與 `stance` 只供 evaluation，runtime verifier
+input 會排除它們。
 
-## 建議的 demo stages
+## 已確認的 demo stages
 
-| Stage | Synthesized input | 目的 |
+| Stage | Controlled input | 目的 |
 |---|---|---|
 | 1 | 一篇初始個人食用油異常回報 | 建立 `experience` Claim，證據仍不足 |
 | 2 | 原文的 pure repost | 保留討論訊號，但不增加獨立佐證或重複 Claim |
 | 3 | 另一位作者的獨立回報，或新增品牌／批次陳述 | 產生新的 Experience 或 Hypothesis Claim |
 | 4 | 主管機關公告或檢驗資料 | 對既有 Fact/Hypothesis Claim 執行 verification |
-| 5 | 反駁資料或新增影響範圍 | 讓 B 展示案件維持、縮小或改變，而非固定升級 |
+| 5 | 公告擴大影響範圍 | 讓 B 展示新候選不繼承舊核可 |
+| 6 | 逐批檢驗後部分放行 | 反駁「所有擴大列管批次仍有問題」並縮小案件範圍 |
 
 ### 官方公告在 M1 的角色
 
-M1 不實作網路 monitor。所謂官方公告，是 D 放在較晚 stage 的 synthesized source，
-用來模擬案件專員後續取得公告。
+M1 不實作網路 monitor。官方公告與新聞是 D 已放在較晚 stage 的 committed external
+source，用來做 deterministic replay；A 不在執行時抓取網站。
 
 若公告本身也要出現在市場時間軸，它可以同時扮演兩個角色：
 
 - 作為新的 Signal 被 ingest，讓 B 將它加入既有 Case。
 - 作為 Evidence 被 verifier 引用，支持或反駁較早的 Claim。
 
-兩個角色可引用同一個 synthesized document 與 URL，不代表內容被視為兩份獨立證據。
+兩個角色可引用同一個 committed document 與 URL，不代表內容被視為兩份獨立證據。
 
 ## A 的處理流程
 
@@ -95,7 +98,7 @@ D dataset stage
 → hand signal_id to B
 
 B requests verification for claim_id
-→ A loads the Claim and available synthesized Evidence
+→ A loads the Claim and available committed Evidence
 → one structured-output LLM call
 → persist verification result and Evidence links
 → B advances the owning Case
@@ -164,6 +167,6 @@ D 交付資料前，A 與 D 一起確認：
 - 每篇 post 都有穩定 source key、原文、發布時間與 stage。
 - Repost 明確指向原始 post；獨立回報不可誤標成 repost。
 - 不強迫每篇 post 同時包含 fact、experience、hypothesis 和 request。
-- Evidence 的來源、時間與 excerpt 完整，且不把 synthesized data 說成真實公告。
+- Evidence 的來源、時間與 excerpt 完整；模擬貼文與真實外部文件各自保留正確標示。
 - 每個 expected verification 都寫明哪些輸入支持它，以及不能推出哪些額外結論。
 - 至少有一條 insufficient／反駁路徑，避免 demo 永遠只會升級。

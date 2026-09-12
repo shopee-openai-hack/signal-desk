@@ -1,42 +1,51 @@
 {
-  "signal_id": "sig_oil_notice_001",
+  "signal_id": "sig_s5_fda_20260707",
   "source": {
-    "provider": "synthesized",
-    "source_id": "notice_oil_support_001",
-    "url": "https://example.test/synthesized/notices/oil-support-001",
-    "author_ref": "fictional_food_authority",
-    "published_at": "2026-09-12T03:00:00Z",
-    "retrieved_at": "2026-09-12T03:01:00Z",
-    "raw_text": "【合成示範公告／非真實機關】虛構抽驗初報稱 Demo 牌 B123 批次的一件樣本未符合示範標準；本公告及機關皆為 hackathon 測試資料。",
+    "provider": "fda_tw",
+    "source_id": "fda_20260707",
+    "url": "https://www.fda.gov.tw/tc/newsContent.aspx?cid=4&id=t634443",
+    "author_ref": null,
+    "published_at": "2026-07-07T09:00:00Z",
+    "retrieved_at": "2026-07-07T09:00:00Z",
+    "raw_text": "擴大為所有使用受影響原料製成之食品，不論比例，7/8 24 時前全面下架。前一日 7/6 公告已擴為 360 家、18 項產品、30 批號。",
     "retrieval_status": "succeeded"
   },
   "source_relation": "original",
   "duplicate_of_signal_id": null,
   "claims": [
     {
-      "claim_id": "clm_oil_notice_fact_001",
-      "signal_id": "sig_oil_notice_001",
+      "claim_id": "clm_s5_scope_expansion",
+      "signal_id": "sig_s5_fda_20260707",
       "kind": "fact",
-      "quote": "Demo 牌 B123 批次的一件樣本未符合示範標準",
-      "normalized_statement": "合成抽驗初報稱 Demo 牌 B123 批次的一件樣本未符合示範標準",
-      "entities": [
-        {"type": "brand", "name": "Demo"}
-      ],
-      "scope": {"region": null, "batch": "B123", "time_window": null},
-      "verification_status": "refuted",
+      "quote": "擴大為所有使用受影響原料製成之食品，不論比例，7/8 24 時前全面下架",
+      "normalized_statement": "所有使用受影響原料製成的食品不論比例，均須在 7/8 24 時前全面下架",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": "7/8 24 時前"},
+      "verification_status": "insufficient_evidence",
       "evidence": [
         {
-          "evidence_id": "ev_oil_refute_b123_001",
-          "claim_id": "clm_oil_notice_fact_001",
-          "url": "https://example.test/synthesized/notices/oil-refute-001",
-          "title": "Synthesized B123 corrected inspection notice (fictional)",
-          "publisher": "Synthesized Food Authority (fictional)",
-          "published_at": "2026-09-12T04:00:00Z",
-          "retrieved_at": "2026-09-12T04:02:00Z",
-          "excerpt": "【合成示範證據】複驗確認樣本標示錯誤，Demo 牌 B123 留樣符合示範標準，先前不合格初報已撤回；本段落是虛構資料。",
-          "stance": "refutes"
+          "evidence_id": "ev_s6_cna_20260723",
+          "claim_id": "clm_s5_scope_expansion",
+          "url": "https://www.cna.com.tw/news/ahel/202607230245.aspx",
+          "title": "中聯油脂案　食藥署公布可重新上架501項產品清單（demo 前需逐字核對）",
+          "publisher": "中央通訊社",
+          "published_at": "2026-07-23T09:04:00Z",
+          "retrieved_at": "2026-07-23T09:05:00Z",
+          "excerpt": "全面檢驗結案後，除已知 7 批不合格油品外未新增問題批號；19 批合格油品製成的 501 項產品列入可重新上架清單。",
+          "stance": "context_only"
         }
       ]
+    },
+    {
+      "claim_id": "clm_s5_prior_scope_count",
+      "signal_id": "sig_s5_fda_20260707",
+      "kind": "fact",
+      "quote": "前一日 7/6 公告已擴為 360 家、18 項產品、30 批號",
+      "normalized_statement": "7/6 公告已擴大為 360 家、18 項產品及 30 批號",
+      "entities": [],
+      "scope": {"region": null, "batch": null, "time_window": "7/6"},
+      "verification_status": "insufficient_evidence",
+      "evidence": []
     }
   ]
 }

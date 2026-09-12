@@ -408,7 +408,7 @@ def test_verify_persists_canonical_evidence_and_replays_without_model_call(
                 "verification_status": "supported",
                 "evidence_assessments": [
                     {
-                        "evidence_id": "ev_oil_support_b123_001",
+                        "evidence_id": "ev_s4_fda_20260701",
                         "stance": "supports",
                     }
                 ],
@@ -431,7 +431,7 @@ def test_verify_persists_canonical_evidence_and_replays_without_model_call(
         )
         claim_id = ingested.json()["claims"][0]["claim_id"]
         verification_payload = {
-            "evidence_ids": ["ev_oil_support_b123_001"],
+            "evidence_ids": ["ev_s4_fda_20260701"],
             "current_stage": 4,
         }
         verified = client.post(
@@ -475,7 +475,7 @@ def test_verification_failure_and_future_evidence_are_not_false_successes(
         future = client.post(
             f"/api/v1/claims/{claim_id}/verify",
             json={
-                "evidence_ids": ["ev_oil_refute_b123_001"],
+                "evidence_ids": ["ev_s6_cna_20260723"],
                 "current_stage": 4,
             },
             headers=_headers("future-evidence-key"),
@@ -483,7 +483,7 @@ def test_verification_failure_and_future_evidence_are_not_false_successes(
         failed = client.post(
             f"/api/v1/claims/{claim_id}/verify",
             json={
-                "evidence_ids": ["ev_oil_support_b123_001"],
+                "evidence_ids": ["ev_s4_fda_20260701"],
                 "current_stage": 4,
             },
             headers=_headers("failed-verification-key"),
