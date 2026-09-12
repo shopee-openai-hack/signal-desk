@@ -242,7 +242,7 @@ Do not edit `app/store.py`, `app/schemas.py` or `app/main.py` in this task.
   operations:
 
   ```python
-  reserve_source(source_input) -> IngestionReservation  # contains signal_id and is_new
+  reserve_source(request: SourceReservation) -> IngestionReservation
   complete_signal(signal_id, claims: list[Claim]) -> Signal
   fail_extraction(signal_id, sanitized_error) -> None
   get_signal(signal_id) -> Signal | None
@@ -422,6 +422,8 @@ This is the only A task allowed to edit `app/main.py`.
   `{ "source": {...}, "source_relation": "...", "duplicate_of_source_id": null }`.
   Require `Idempotency-Key` and return the canonical `Signal` with HTTP 200 for both
   first success and an idempotent repeat.
+- Convert that HTTP envelope once into A2's canonical `SourceReservation`; do not keep
+  a second pass-through ingestion service around the store.
 - Define the verify request body exactly as
   `{ "evidence_ids": ["ev_001"], "current_stage": 4 }`. Require
   `Idempotency-Key` and return the updated canonical `Claim` with HTTP 200.
